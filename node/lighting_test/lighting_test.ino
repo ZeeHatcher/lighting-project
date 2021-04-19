@@ -4,35 +4,44 @@
 #include <Adafruit_DotStar.h>
 #include <SPI.h>
 
-#define NUM_PIXELS 5
+#define NUM_PIXELS 3
 
 Adafruit_DotStar strip(NUM_PIXELS, DOTSTAR_BRG);
 
 void setup() {
+  Serial.begin(115200);
+  
   strip.begin();
   strip.show();
-
-  Serial.begin(115200);
 }
 
-const int INPUT_SIZE = (7 * NUM_PIXELS) - 1;
-const char * DELIM = ",";
-
-char input[INPUT_SIZE + 1];
+const int SIZE_BUFFER = NUM_PIXELS;
 
 void loop() {
   if (Serial.available() > 0) {
-    byte size = Serial.readBytes(input, INPUT_SIZE);
-
-    byte i = 0;
-    char * color = strtok(input, DELIM);
-    while (color != NULL) {
-      strip.setPixelColor(i, strtoul(color, NULL, 16));
+    char r[SIZE_BUFFER] = {0};
+    char g[SIZE_BUFFER] = {0};
+    char b[SIZE_BUFFER] = {0};
+    
+    // Read RGB into channels
+    Serial.readBytes(r, SIZE_BUFFER);
+    Serial.readBytes(g, SIZE_BUFFER);
+    Serial.readBytes(b, SIZE_BUFFER);
+    
+    // Derive RGB value for each DotStar pixel
+    for (int i = 0; i < NUM_PIXELS; i++) {
+      // DotStar library uses GRB (not RGB)
+      // For correct conversion, byte array values is LSB -> MSB
+      char bytes[4] = {b[i], r[i], g[i]};
+      uint32_t color;
       
-      color = strtok(NULL, DELIM);
-      i++;
+      // Convert bytes to 32-bit integer
+      memcpy(&color, bytes, sizeof(uint32_t));
+      
+      strip.setPixelColor(i, color);
     }
-  
+    
     strip.show();
   }
 }
+
