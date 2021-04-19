@@ -4,7 +4,7 @@
 #include <Adafruit_DotStar.h>
 #include <SPI.h>
 
-#define NUM_PIXELS 3
+#define NUM_PIXELS 144
 
 Adafruit_DotStar strip(NUM_PIXELS, DOTSTAR_BRG);
 
