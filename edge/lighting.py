@@ -1,4 +1,6 @@
 import serial
+import random
+import time
 
 from abc import ABCMeta, abstractmethod
 
@@ -26,22 +28,33 @@ def setup():
     pass
 
 def loop():
-    val = raw_input("Please enter a value: ")
-    r = g = b = b'\x00'
+    r = bytearray(NUM_PIXELS)
 
-    if val == "r":
-        r = b'\x33'
-    elif val == "g":
-        g = b'\x33'
-    elif val == "b":
-        b = b'\x33'
+    for i in range(136, NUM_PIXELS):
+        r[i] = b'\xff'
 
-    ser.write(r * NUM_PIXELS)
-    ser.write(g * NUM_PIXELS)
-    ser.write(b * NUM_PIXELS)
+    ser.write(r)
+    ser.write(b'\x00' * NUM_PIXELS)
+    ser.write(b'\x00' * NUM_PIXELS)
+
+    # for i in range(NUM_PIXELS):
+        # r = bytearray(NUM_PIXELS)
+        # g = bytearray(NUM_PIXELS)
+        # b = bytearray(NUM_PIXELS)
+
+        # r[i] = b'\xff'
+        # g[i] = b'\xff'
+        # b[i] = b'\xff'
+
+        # ser.write(r)
+        # ser.write(g)
+        # ser.write(b)
 
 if __name__ == "__main__":
     setup()
+
+    # Short delay to let serial setup properly
+    time.sleep(1)
 
     while (True):
         loop()

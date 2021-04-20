@@ -12,6 +12,7 @@ void setup() {
   Serial.begin(115200);
   
   strip.begin();
+  strip.clear();
   strip.show();
 }
 
@@ -30,15 +31,8 @@ void loop() {
     
     // Derive RGB value for each DotStar pixel
     for (int i = 0; i < NUM_PIXELS; i++) {
-      // DotStar library uses GRB (not RGB)
-      // For correct conversion, byte array values is LSB -> MSB
-      char bytes[4] = {b[i], r[i], g[i]};
-      uint32_t color;
-      
-      // Convert bytes to 32-bit integer
-      memcpy(&color, bytes, sizeof(uint32_t));
-      
-      strip.setPixelColor(i, color);
+      // Lightstrip uses GRB, not RGB
+      strip.setPixelColor(i, (uint8_t) g[i], (uint8_t) r[i], (uint8_t) b[i]);
     }
     
     strip.show();
