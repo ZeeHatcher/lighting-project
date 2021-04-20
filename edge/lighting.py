@@ -1,22 +1,60 @@
 import serial
-import random
 import time
 
 from abc import ABCMeta, abstractmethod
 
+class Color:
+    def __init__(self, color="000000"):
+        if len(color) < 6:
+            color = "000000"
+
+        self.r = color[:2].decode("hex")
+        self.g = color[2:4].decode("hex")
+        self.b = color[4:].decode("hex")
+
 class Mode:
     __metaclass__ = ABCMeta
 
-    @abstractmethod
     def run(self):
+        r, g, b = self._process()
+
+        ser.write(r)
+        ser.write(g)
+        ser.write(b)
+
+    @abstractmethod
+    def _process(self):
         pass
 
 class BasicMode(Mode):
-    def run(self):
-        print("Basic mode")
+    def __init__(self):
+        self._pattern = SolidPattern()
+
+    def _process(self):
+        return self._pattern.render()
+
+class Pattern:
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def render(self):
+        pass
+
+class SolidPattern(Pattern):
+    def __init__(self):
+        self._color = Color()
+
+    def render(self):
+        self._color = Color(raw_input("Color: "))
+
+        r = self._color.r * NUM_PIXELS
+        g = self._color.g * NUM_PIXELS
+        b = self._color.b * NUM_PIXELS
+
+        return r, g, b
 
 BAUD_RATE = 115200
-NUM_PIXELS = 144
+NUM_PIXELS = 8
 
 db = None
 ser = None
@@ -25,30 +63,9 @@ def setup():
     global ser
     ser = serial.Serial('/dev/ttyACM0', BAUD_RATE)
 
-    pass
-
 def loop():
-    r = bytearray(NUM_PIXELS)
-
-    for i in range(136, NUM_PIXELS):
-        r[i] = b'\xff'
-
-    ser.write(r)
-    ser.write(b'\x00' * NUM_PIXELS)
-    ser.write(b'\x00' * NUM_PIXELS)
-
-    # for i in range(NUM_PIXELS):
-        # r = bytearray(NUM_PIXELS)
-        # g = bytearray(NUM_PIXELS)
-        # b = bytearray(NUM_PIXELS)
-
-        # r[i] = b'\xff'
-        # g[i] = b'\xff'
-        # b[i] = b'\xff'
-
-        # ser.write(r)
-        # ser.write(g)
-        # ser.write(b)
+    mode = BasicMode()
+    mode.run()
 
 if __name__ == "__main__":
     setup()
