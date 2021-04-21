@@ -16,11 +16,11 @@ class Mode:
     __metaclass__ = ABCMeta
 
     def run(self):
-        r, g, b = self._process()
+        c_r, c_g, c_b = self._process()
 
-        ser.write(r)
-        ser.write(g)
-        ser.write(b)
+        ser.write(c_r)
+        ser.write(c_g)
+        ser.write(c_b)
 
     @abstractmethod
     def _process(self):
@@ -41,30 +41,51 @@ class Pattern:
         pass
 
 class SolidPattern(Pattern):
+    def render(self):
+        color = Color(raw_input("Color: "))
+
+        c_r = color.r * NUM_PIXELS
+        c_g = color.g * NUM_PIXELS
+        c_b = color.b * NUM_PIXELS
+
+        return c_r, c_g, c_b
+
+class DotPattern(Pattern):
     def __init__(self):
-        self._color = Color()
+        self._i = 0
 
     def render(self):
-        self._color = Color(raw_input("Color: "))
+        color = Color("ff3300")
 
-        r = self._color.r * NUM_PIXELS
-        g = self._color.g * NUM_PIXELS
-        b = self._color.b * NUM_PIXELS
+        c_r = bytearray(NUM_PIXELS)
+        c_g = bytearray(NUM_PIXELS)
+        c_b = bytearray(NUM_PIXELS)
 
-        return r, g, b
+        c_r[self._i] = color.r
+        c_g[self._i] = color.g
+        c_b[self._i] = color.b
+
+        self._i += 1
+
+        if self._i >= NUM_PIXELS:
+            self._i = 0
+
+        time.sleep(0.1)
+
+        return c_r, c_g, c_b
 
 BAUD_RATE = 115200
 NUM_PIXELS = 8
 
 db = None
 ser = None
+mode = BasicMode()
 
 def setup():
     global ser
     ser = serial.Serial('/dev/ttyACM0', BAUD_RATE)
 
 def loop():
-    mode = BasicMode()
     mode.run()
 
 if __name__ == "__main__":
