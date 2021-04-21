@@ -26,7 +26,7 @@
                 <div class="col d-flex justify-content-end align-items-center">
                   <span class="fs-7 me-2">off</span>
                   <div class="form-switch">
-                    <input name="state" class="form-check-input" type="checkbox">
+                    <input name="state" class="form-check-input" type="checkbox" {% if lightsticks[1].is_on %}checked{% endif %}>
                   </div>
                   <span class="fs-7">on</span>
                 </div>
@@ -34,11 +34,9 @@
 
               <div class="row">
                 <nav id="btns" class="col d-flex justify-content-end flex-wrap">
-                  <div id="btn-basic" class="btn btn-text fs-7 ms-1 active">basic</div>
-                  <div id="btn-image" class="btn btn-text fs-7 ms-1">image</div>
-                  <div id="btn-audio" class="btn btn-text fs-7 ms-1">audio</div>
-                  <div id="btn-microphone" class="btn btn-text fs-7 ms-1">microphone</div>
-                  <div id="btn-lightsaber" class="btn btn-text fs-7 ms-1">lightsaber</div>
+                  {% for id, mode in modes.items() %}
+                  <div id="btn-{{ mode.name }}" class="btn btn-text fs-7 ms-1 {% if lightsticks[1].mode == id %}active{% endif %}">{{ mode.name }}</div>
+                  {% endfor %}
                 </nav>
               </div>
             </div>
@@ -46,19 +44,16 @@
         </header>
 
         <main id="panels" class="my-5">
-          <div id="panel-basic">
+          <div id="panel-basic" class="{% if lightsticks[1].mode != 1 %}d-none{% endif %}">
             <h2 id="main-header mb-4">basic</h2>
 
             <div class="my-4">
               <h6 class="m-0">pattern</h6>
 
               <div class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 gx-2 gy-2 mt-3 btn-grid">
-                <div class="col"><button class="btn btn-outline-dark">solid</button></div>
-                <div class="col"><button class="btn btn-outline-dark">dot</button></div>
-                <div class="col"><button class="btn btn-outline-dark">blink</button></div>
-                <div class="col"><button class="btn btn-outline-dark">breathe</button></div>
-                <div class="col"><button class="btn btn-outline-dark">rainbow</button></div>
-                <div class="col"><button class="btn btn-outline-dark">sine</button></div>
+                {% for id, pattern in patterns.items() %}
+                <div class="col"><button class="btn btn-outline-dark {% if lightsticks[1].pattern == id %}active{% endif %}">{{ pattern.name }}</button></div>
+                {% endfor %}
               </div>
             </div>
 
@@ -68,7 +63,20 @@
             </p>
           </div>
 
-          <div id="panel-image">
+          <div id="panel-image" class="{% if lightsticks[1].mode != 2 %}d-none{% endif %}">
+            <h2 id="main-header mb-4">image</h2>
+          </div>
+
+          <div id="panel-audio" class="{% if lightsticks[1].mode != 3 %}d-none{% endif %}">
+            <h2 id="main-header mb-4">audio</h2>
+          </div>
+
+          <div id="panel-microphone" class="{% if lightsticks[1].mode != 4 %}d-none{% endif %}">
+            <h2 id="main-header mb-4">microphone</h2>
+          </div>
+
+          <div id="panel-lightsaber" class="{% if lightsticks[1].mode != 5 %}d-none{% endif %}">
+            <h2 id="main-header mb-4">lightsaber</h2>
           </div>
         </main>
 
@@ -81,7 +89,11 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js" integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
     <script>
-    
+      $(document).ready(function() {
+        let lightsticks = {{ lightsticks|tojson }};
+        let modes = {{ modes|tojson }};
+        let patterns = {{ patterns|tojson }};
+      });
     </script>
   </body>
 </html>

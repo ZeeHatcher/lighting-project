@@ -1,8 +1,25 @@
+import MySQLdb
+import os
 import serial
 import time
 
 from abc import ABCMeta, abstractmethod
+from dotenv import load_dotenv
 
+load_dotenv()
+
+# Load environment variables
+DB_HOST = os.environ.get("DB_HOST")
+DB_USERNAME = os.environ.get("DB_USERNAME")
+DB_PASSWORD = os.environ.get("DB_PASSWORD")
+DB_DATABASE = os.environ.get("DB_DATABASE")
+
+LIGHTSTICK_ID = os.environ.get("LIGHTSTICK_ID")
+NUM_PIXELS = int(os.environ.get("NUM_PIXELS"))
+BAUD_RATE = int(os.environ.get("BAUD_RATE"))
+SERIAL_CONN = os.environ.get("SERIAL_CONN")
+
+# Custom data type for color
 class Color:
     def __init__(self, color="000000"):
         if len(color) < 6:
@@ -26,12 +43,45 @@ class Mode:
     def _process(self):
         pass
 
+class NullMode(Mode):
+    def _process(self):
+        c_r = bytearray(NUM_PIXELS)
+        c_g = bytearray(NUM_PIXELS)
+        c_b = bytearray(NUM_PIXELS)
+
+        return c_r, c_g, c_b
+
 class BasicMode(Mode):
     def __init__(self):
-        self._pattern = SolidPattern()
+        self._pattern_id = None
+        self._pattern = None
 
     def _process(self):
+        self._get_pattern()
+
         return self._pattern.render()
+
+    def _get_pattern(self):
+        new_pattern_id = None
+
+        # Constantly get latest pattern value
+        with db.cursor() as cur:
+            cur.execute("SELECT pattern FROM lightsticks WHERE id = %s" % LIGHTSTICK_ID)
+            
+            new_pattern_id = cur.fetchone()[0]
+
+            cur.close()
+
+        # If pattern has actually changed
+        if new_pattern_id != self._pattern_id:
+            if new_pattern_id == 1:
+                self._pattern = SolidPattern()
+            elif new_pattern_id == 2:
+                self._pattern = DotPattern()
+            else:
+                self._pattern = NullPattern()
+
+            self._pattern_id = new_pattern_id
 
 class Pattern:
     __metaclass__ = ABCMeta
@@ -39,6 +89,14 @@ class Pattern:
     @abstractmethod
     def render(self):
         pass
+
+class NullPattern(Pattern):
+    def render(self):
+        c_r = bytearray(NUM_PIXELS)
+        c_g = bytearray(NUM_PIXELS)
+        c_b = bytearray(NUM_PIXELS)
+
+        return c_r, c_g, c_b
 
 class SolidPattern(Pattern):
     def render(self):
@@ -74,23 +132,38 @@ class DotPattern(Pattern):
 
         return c_r, c_g, c_b
 
-BAUD_RATE = 115200
-NUM_PIXELS = 8
+db = MySQLdb.connect(DB_HOST, DB_USERNAME, DB_PASSWORD, DB_DATABASE) or die("Could not connect to database")
+db.autocommit(True)
 
-db = None
-ser = None
-mode = BasicMode()
+ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
 
-def setup():
-    global ser
-    ser = serial.Serial('/dev/ttyACM0', BAUD_RATE)
+mode_id = None
+mode = None
 
 def loop():
+    global mode_id, mode
+    new_mode_id = None
+
+    # Constantly get latest mode value
+    with db.cursor() as cur:
+        cur.execute("SELECT mode FROM lightsticks WHERE id = %s" % LIGHTSTICK_ID)
+        
+        new_mode_id = cur.fetchone()[0]
+
+        cur.close()
+
+    # If mode has actually changed
+    if new_mode_id != mode_id:
+        if new_mode_id == 1:
+            mode = BasicMode()
+        else:
+            mode = NullMode()
+
+        mode_id = new_mode_id
+
     mode.run()
 
 if __name__ == "__main__":
-    setup()
-
     # Short delay to let serial setup properly
     time.sleep(1)
 
