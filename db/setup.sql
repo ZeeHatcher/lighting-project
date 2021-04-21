@@ -1,5 +1,3 @@
-USE lighting_db;
-
 CREATE TABLE modes (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   name VARCHAR(64) NOT NULL,
