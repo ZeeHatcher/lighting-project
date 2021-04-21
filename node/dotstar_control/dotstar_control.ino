@@ -6,7 +6,7 @@
 
 #define NUM_PIXELS 8
 
-Adafruit_DotStar strip(NUM_PIXELS, DOTSTAR_BRG);
+Adafruit_DotStar strip(NUM_PIXELS, DOTSTAR_BGR);
 
 void setup() {
   Serial.begin(115200);
@@ -29,8 +29,7 @@ void loop() {
     
     // Set RGB value for each DotStar pixel
     for (int i = 0; i < NUM_PIXELS; i++) {
-      // Lightstrip uses GRB, not RGB
-      strip.setPixelColor(i, (uint8_t) g[i], (uint8_t) r[i], (uint8_t) b[i]);
+      strip.setPixelColor(i, (uint8_t) r[i], (uint8_t) g[i], (uint8_t) b[i]);
     }
     
     strip.show();
