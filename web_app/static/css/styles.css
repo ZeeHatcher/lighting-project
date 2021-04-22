@@ -2,6 +2,10 @@ body {
   font-family: 'Roboto Mono', monospace;
 }
 
+#panels > div {
+  display: none
+}
+
 .btn-grid .btn {
   width: 100%;
 }
@@ -18,6 +22,11 @@ body {
 
 .btn-text:hover {
   color: #000000;
+}
+
+.btn-square {
+  width: 38px;
+  height: 38px;
 }
 
 .content {

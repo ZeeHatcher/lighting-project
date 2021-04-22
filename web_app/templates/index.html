@@ -20,22 +20,22 @@
       <div class="content p-4">
         <header>
           <div class="row">
-            <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2">1</span></h1>
+            <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2" data-value={{ 1 }}>1</span></h1>
             <div class="col-6">
               <div class="row">
                 <div class="col d-flex justify-content-end align-items-center">
                   <span class="fs-7 me-2">off</span>
                   <div class="form-switch">
-                    <input name="state" class="form-check-input" type="checkbox" {% if lightsticks[1].is_on %}checked{% endif %}>
+                    <input id="switch-power" class="form-check-input" type="checkbox" {% if lightsticks[1].is_on %}checked{% endif %}>
                   </div>
                   <span class="fs-7">on</span>
                 </div>
               </div>
 
               <div class="row">
-                <nav id="btns" class="col d-flex justify-content-end flex-wrap">
+                <nav id="modes" class="col d-flex justify-content-end flex-wrap">
                   {% for id, mode in modes.items() %}
-                  <div id="btn-{{ mode.name }}" class="btn btn-text fs-7 ms-1 {% if lightsticks[1].mode == id %}active{% endif %}">{{ mode.name }}</div>
+                  <div class="btn btn-text fs-7 ms-1{% if lightsticks[1].mode == id %} active{% endif %}" data-value={{ id }}>{{ mode.name }}</div>
                   {% endfor %}
                 </nav>
               </div>
@@ -44,15 +44,15 @@
         </header>
 
         <main id="panels" class="my-5">
-          <div id="panel-basic" class="{% if lightsticks[1].mode != 1 %}d-none{% endif %}">
+          <div id="panel-basic" class="{% if lightsticks[1].mode == 1 %}d-block{% endif %}">
             <h2 id="main-header mb-4">basic</h2>
 
             <div class="my-4">
               <h6 class="m-0">pattern</h6>
 
-              <div class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 gx-2 gy-2 mt-3 btn-grid">
+              <div id="patterns" class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 gx-2 gy-2 mt-3 btn-grid">
                 {% for id, pattern in patterns.items() %}
-                <div class="col"><button class="btn btn-outline-dark {% if lightsticks[1].pattern == id %}active{% endif %}">{{ pattern.name }}</button></div>
+                <div class="col"><button class="btn btn-outline-dark {% if lightsticks[1].pattern == id %}active{% endif %}" data-value={{ id }}>{{ pattern.name }}</button></div>
                 {% endfor %}
               </div>
             </div>
@@ -61,21 +61,25 @@
             <p>
               set the color(s) displayed in the pattern
             </p>
+            <div id="colors" class="d-flex">
+              <input type="color" class="btn btn-square p-0 me-1">
+              <button id="btn-submit-color" class="btn btn-primary"{% if patterns[lightsticks[1].pattern].num_colors == 0 %}disabled{% endif %}>submit</button>
+            </div>
           </div>
 
-          <div id="panel-image" class="{% if lightsticks[1].mode != 2 %}d-none{% endif %}">
+          <div id="panel-image" class="{% if lightsticks[1].mode == 2 %}d-block{% endif %}">
             <h2 id="main-header mb-4">image</h2>
           </div>
 
-          <div id="panel-audio" class="{% if lightsticks[1].mode != 3 %}d-none{% endif %}">
+          <div id="panel-audio" class="{% if lightsticks[1].mode == 3 %}d-block{% endif %}">
             <h2 id="main-header mb-4">audio</h2>
           </div>
 
-          <div id="panel-microphone" class="{% if lightsticks[1].mode != 4 %}d-none{% endif %}">
+          <div id="panel-microphone" class="{% if lightsticks[1].mode == 4 %}d-block{% endif %}">
             <h2 id="main-header mb-4">microphone</h2>
           </div>
 
-          <div id="panel-lightsaber" class="{% if lightsticks[1].mode != 5 %}d-none{% endif %}">
+          <div id="panel-lightsaber" class="{% if lightsticks[1].mode == 5 %}d-block{% endif %}">
             <h2 id="main-header mb-4">lightsaber</h2>
           </div>
         </main>
@@ -93,6 +97,71 @@
         let lightsticks = {{ lightsticks|tojson }};
         let modes = {{ modes|tojson }};
         let patterns = {{ patterns|tojson }};
+
+        function updateLightstick(field, value) {
+          let lightstickId = $("#lightstick").data("value");
+
+          $.ajax({
+            url: "/lightstick/" + lightstickId,
+            method: "POST",
+            data: { field, value },
+            success: function (res) {
+              console.log(res);
+            },
+          });
+        }
+
+        function onModeSwitch() {
+          let modeId = $(this).data("value");
+
+          updateLightstick("mode", modeId);
+
+          $("#modes .btn").removeClass("active");
+          $(this).addClass("active");
+
+          $("#panels > div").removeClass("d-block");
+          $("#panel-" + modes[modeId].name).addClass("d-block");
+        }
+
+        function onPatternSwitch() {
+          let patternId = $(this).data("value");
+
+          updateLightstick("pattern", patternId);
+
+          $("#patterns .btn").removeClass("active");
+          $(this).addClass("active");
+
+          let num_colors = patterns[patternId].num_colors;
+          $("#btn-submit-color").attr("disabled", num_colors == 0);
+
+          $("#colors").find("input[type='color']").remove();
+
+          let inputDOM = "<input type='color' class='btn btn-square p-0 me-1'>";
+          for (let i = 0; i < num_colors; i++) {
+            $("#colors").prepend(inputDOM);
+          }
+        }
+
+        function onColorSubmit() {
+          let colors = $("#colors input[type='color']").map(function() {
+            return $(this).val().substring(1);
+          })
+            .get()
+            .join(",");
+
+          updateLightstick("colors", colors);
+        }
+
+        function onPowerSwitch() {
+          let is_on = $(this).is(":checked") ? 1 : 0;
+          updateLightstick("is_on", is_on)
+        }
+
+        // Attach click handlers
+        $(document).on("click", "#modes .btn", onModeSwitch);
+        $(document).on("click", "#patterns .btn", onPatternSwitch);
+        $(document).on("click", "#btn-submit-color", onColorSubmit);
+        $(document).on("click", "#switch-power", onPowerSwitch);
       });
     </script>
   </body>

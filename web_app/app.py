@@ -14,6 +14,7 @@ DB_DATABASE = os.environ.get("DB_DATABASE")
 
 app = Flask(__name__)
 db = MySQLdb.connect(DB_HOST, DB_USERNAME, DB_PASSWORD, DB_DATABASE) or die("Could not connect to database")
+db.autocommit(True)
 
 @app.route("/")
 def index():
@@ -72,6 +73,20 @@ def index():
         }
 
     return render_template("index.html", lightsticks=lightsticks, modes=modes, patterns=patterns)
+
+@app.route("/lightstick/<lightstick>", methods=["POST"])
+def update(lightstick):
+    field = request.form["field"]
+    value = request.form["value"]
+
+    with db.cursor() as cur:
+        cur.execute("UPDATE lightsticks SET %s = '%s' WHERE id = '%s'" % (field, value, lightstick))
+
+        cur.close()
+
+    res = { "status": 200, "message": "Successfully updated lightstick." }
+
+    return jsonify(res)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=80, debug=True)

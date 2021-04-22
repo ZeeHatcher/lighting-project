@@ -90,6 +90,21 @@ class Pattern:
     def render(self):
         pass
 
+    def _get_colors(self):
+        colors = []
+
+        with db.cursor() as cur:
+            cur.execute("SELECT colors FROM lightsticks WHERE id = %s" % LIGHTSTICK_ID)
+
+            color_string = cur.fetchone()[0]
+
+            if color_string != None:
+                colors = color_string.split(",")
+
+            cur.close()
+
+        return colors
+
 class NullPattern(Pattern):
     def render(self):
         c_r = bytearray(NUM_PIXELS)
@@ -100,7 +115,9 @@ class NullPattern(Pattern):
 
 class SolidPattern(Pattern):
     def render(self):
-        color = Color(raw_input("Color: "))
+        colors = self._get_colors()
+
+        color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
 
         c_r = color.r * NUM_PIXELS
         c_g = color.g * NUM_PIXELS
@@ -113,7 +130,9 @@ class DotPattern(Pattern):
         self._i = 0
 
     def render(self):
-        color = Color("ff3300")
+        colors = self._get_colors()
+
+        color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
 
         c_r = bytearray(NUM_PIXELS)
         c_g = bytearray(NUM_PIXELS)
@@ -144,13 +163,27 @@ def loop():
     global mode_id, mode
     new_mode_id = None
 
-    # Constantly get latest mode value
+    is_on = True
+
+    # Constantly get on/off state of lightstick
     with db.cursor() as cur:
-        cur.execute("SELECT mode FROM lightsticks WHERE id = %s" % LIGHTSTICK_ID)
+        cur.execute("SELECT is_on FROM lightsticks WHERE id = %s" % LIGHTSTICK_ID)
         
-        new_mode_id = cur.fetchone()[0]
+        state = cur.fetchone()[0]
+        is_on = state == 1
 
         cur.close()
+
+    if is_on:
+        # Constantly get latest mode value
+        with db.cursor() as cur:
+            cur.execute("SELECT mode FROM lightsticks WHERE id = %s" % LIGHTSTICK_ID)
+            
+            new_mode_id = cur.fetchone()[0]
+
+            cur.close()
+    else:
+        new_mode_id = 0
 
     # If mode has actually changed
     if new_mode_id != mode_id:
