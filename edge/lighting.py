@@ -6,6 +6,8 @@ import time
 from abc import ABCMeta, abstractmethod
 from dotenv import load_dotenv
 
+from virtual import VirtualLightstick
+
 load_dotenv()
 
 # Load environment variables
@@ -32,22 +34,17 @@ class Color:
 class Mode:
     __metaclass__ = ABCMeta
 
-    def run(self):
-        c_r, c_g, c_b = self._process()
-
-        ser.write(c_r)
-        ser.write(c_g)
-        ser.write(c_b)
-
     @abstractmethod
-    def _process(self):
+    def run(self):
         pass
 
 class NullMode(Mode):
-    def _process(self):
-        c_r = bytearray(NUM_PIXELS)
-        c_g = bytearray(NUM_PIXELS)
-        c_b = bytearray(NUM_PIXELS)
+    def run(self):
+        color = Color()
+
+        c_r = color.r * NUM_PIXELS
+        c_g = color.g * NUM_PIXELS
+        c_b = color.b * NUM_PIXELS
 
         return c_r, c_g, c_b
 
@@ -56,7 +53,7 @@ class BasicMode(Mode):
         self._pattern_id = None
         self._pattern = None
 
-    def _process(self):
+    def run(self):
         self._get_pattern()
 
         return self._pattern.render()
@@ -107,9 +104,11 @@ class Pattern:
 
 class NullPattern(Pattern):
     def render(self):
-        c_r = bytearray(NUM_PIXELS)
-        c_g = bytearray(NUM_PIXELS)
-        c_b = bytearray(NUM_PIXELS)
+        color = Color()
+
+        c_r = color.r * NUM_PIXELS
+        c_g = color.g * NUM_PIXELS
+        c_b = color.b * NUM_PIXELS
 
         return c_r, c_g, c_b
 
@@ -134,9 +133,9 @@ class DotPattern(Pattern):
 
         color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
 
-        c_r = bytearray(NUM_PIXELS)
-        c_g = bytearray(NUM_PIXELS)
-        c_b = bytearray(NUM_PIXELS)
+        c_r = ["\x00"]* NUM_PIXELS
+        c_g = ["\x00"]* NUM_PIXELS
+        c_b = ["\x00"]* NUM_PIXELS
 
         c_r[self._i] = color.r
         c_g[self._i] = color.g
@@ -154,7 +153,8 @@ class DotPattern(Pattern):
 db = MySQLdb.connect(DB_HOST, DB_USERNAME, DB_PASSWORD, DB_DATABASE) or die("Could not connect to database")
 db.autocommit(True)
 
-ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
+ser = None
+lightstick = None
 
 mode_id = None
 mode = None
@@ -194,11 +194,22 @@ def loop():
 
         mode_id = new_mode_id
 
-    mode.run()
+    c_r, c_g, c_b = mode.run()
+
+    if ser != None:
+        ser.write(c_r)
+        ser.write(c_g)
+        ser.write(c_b)
+
+    if lightstick != None:
+        lightstick.update(c_r, c_g, c_b)
 
 if __name__ == "__main__":
     # Short delay to let serial setup properly
     time.sleep(1)
+
+    # ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
+    lightstick = VirtualLightstick(NUM_PIXELS)
 
     while (True):
         loop()
