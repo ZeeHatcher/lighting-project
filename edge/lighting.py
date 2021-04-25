@@ -42,9 +42,7 @@ class NullMode(Mode):
     def run(self):
         color = Color()
 
-        c_r = color.r * NUM_PIXELS
-        c_g = color.g * NUM_PIXELS
-        c_b = color.b * NUM_PIXELS
+        c_r = c_g = c_b = ["\x00"] * NUM_PIXELS
 
         return c_r, c_g, c_b
 
@@ -104,11 +102,7 @@ class Pattern:
 
 class NullPattern(Pattern):
     def render(self):
-        color = Color()
-
-        c_r = color.r * NUM_PIXELS
-        c_g = color.g * NUM_PIXELS
-        c_b = color.b * NUM_PIXELS
+        c_r = c_g = c_b = ["\x00"] * NUM_PIXELS
 
         return c_r, c_g, c_b
 
@@ -118,33 +112,37 @@ class SolidPattern(Pattern):
 
         color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
 
-        c_r = color.r * NUM_PIXELS
-        c_g = color.g * NUM_PIXELS
-        c_b = color.b * NUM_PIXELS
+        c_r = [color.r] * NUM_PIXELS
+        c_g = [color.g] * NUM_PIXELS
+        c_b = [color.b] * NUM_PIXELS
 
         return c_r, c_g, c_b
 
 class DotPattern(Pattern):
     def __init__(self):
         self._i = 0
+        self._dir = 1
 
     def render(self):
         colors = self._get_colors()
 
         color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
 
-        c_r = ["\x00"]* NUM_PIXELS
-        c_g = ["\x00"]* NUM_PIXELS
-        c_b = ["\x00"]* NUM_PIXELS
+        c_r = ["\x00"] * NUM_PIXELS
+        c_g = ["\x00"] * NUM_PIXELS
+        c_b = ["\x00"] * NUM_PIXELS
 
         c_r[self._i] = color.r
         c_g[self._i] = color.g
         c_b[self._i] = color.b
 
-        self._i += 1
+        if self._i >= NUM_PIXELS - 1:
+            self._dir = -1
 
-        if self._i >= NUM_PIXELS:
-            self._i = 0
+        if self._i <= 0:
+            self._dir = 1
+
+        self._i += self._dir
 
         time.sleep(0.1)
 
