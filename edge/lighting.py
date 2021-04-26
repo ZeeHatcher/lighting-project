@@ -75,6 +75,8 @@ class BasicMode(Mode):
                 self._pattern = SolidPattern()
             elif new_pattern_id == 2:
                 self._pattern = DotPattern()
+            elif new_pattern_id == 6:
+                self._pattern = WavePattern()
             else:
                 self._pattern = NullPattern()
 
@@ -145,6 +147,38 @@ class DotPattern(Pattern):
 
         if self._i >= NUM_PIXELS:
             self._i = 0
+
+        time.sleep(0.1)
+
+        return c_r, c_g, c_b
+        
+class WavePattern(Pattern):
+    def __init__(self):
+        self._i = 0
+        self._ascending = True
+        
+    def render(self):
+        colors = self._get_colors()
+
+        color0 = Color(colors[0]) if len(colors[0]) == 6 else Color()
+        color1 = Color(colors[-1]) if len(colors[-1]) == 6 else Color()
+        c_r = [color0.r] * NUM_PIXELS
+        c_g = [color0.g] * NUM_PIXELS
+        c_b = [color0.b] * NUM_PIXELS
+        
+        c_r[0:self._i] = [color1.r]*self._i
+        c_g[0:self._i] = [color1.g]*self._i
+        c_b[0:self._i] = [color1.b]*self._i
+        
+        if self._ascending:
+            self._i += 1
+        else:
+            self._i -= 1
+
+        if self._i >= NUM_PIXELS and self._ascending:
+            self._ascending = False
+        if self._i == 0 and not self._ascending:
+            self._ascending = True
 
         time.sleep(0.1)
 
