@@ -62,7 +62,13 @@
               set the color(s) displayed in the pattern
             </p>
             <div id="colors" class="d-flex">
-              <input type="color" class="btn btn-square p-0 me-1">
+              {% set colors = [] %}
+              {% if lightsticks[1].colors != None %}
+                {% set colors = lightsticks[1].colors.split(",") %}
+              {% endif %}
+              {% for i in range(patterns[lightsticks[1].pattern].num_colors) %}
+              <input type="color" class="btn btn-square p-0 me-1"{% if i < colors|length %}value="#{{ colors[i] }}"{% endif %}>
+              {% endfor %}
               <button id="btn-submit-color" class="btn btn-primary"{% if patterns[lightsticks[1].pattern].num_colors == 0 %}disabled{% endif %}>submit</button>
             </div>
           </div>
@@ -99,8 +105,12 @@
         let patterns = {{ patterns|tojson }};
 
         function updateLightstick(field, value) {
+          // Get lightstick ID
           let lightstickId = $("#lightstick").data("value");
 
+          lightsticks[lightstickId][field] = value;
+
+          // Send AJAX update request
           $.ajax({
             url: "/lightstick/" + lightstickId,
             method: "POST",
@@ -116,33 +126,50 @@
 
           updateLightstick("mode", modeId);
 
+          // Change "active" button
           $("#modes .btn").removeClass("active");
           $(this).addClass("active");
 
+          // Switch control panels
           $("#panels > div").removeClass("d-block");
           $("#panel-" + modes[modeId].name).addClass("d-block");
         }
 
         function onPatternSwitch() {
+          let lightstickId = $("#lightstick").data("value");
           let patternId = $(this).data("value");
 
           updateLightstick("pattern", patternId);
 
+          // Change "active" button
           $("#patterns .btn").removeClass("active");
           $(this).addClass("active");
 
+          // If pattern does not need colors, disable "submit-color" button
           let num_colors = patterns[patternId].num_colors;
           $("#btn-submit-color").attr("disabled", num_colors == 0);
 
+          // Update color inputs
+          let colors = [];
+          if (lightsticks[lightstickId].colors != null) {
+            colors = lightsticks[lightstickId].colors.split(",")
+          }
+
           $("#colors").find("input[type='color']").remove();
 
-          let inputDOM = "<input type='color' class='btn btn-square p-0 me-1'>";
           for (let i = 0; i < num_colors; i++) {
-            $("#colors").prepend(inputDOM);
+            let inputDOM = $("<input type='color' class='btn btn-square p-0 me-1'>");
+
+            if (i < colors.length) {
+              inputDOM.val("#" + colors[i])
+            }
+
+            $("#btn-submit-color").before(inputDOM);
           }
         }
 
         function onColorSubmit() {
+          // Get color input values and join into a single string
           let colors = $("#colors input[type='color']").map(function() {
             return $(this).val().substring(1);
           })
