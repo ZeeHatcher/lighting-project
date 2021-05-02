@@ -2,6 +2,7 @@ import json
 import os
 import MySQLdb
 
+from contextlib import closing
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify
 
@@ -22,29 +23,23 @@ def index():
     rows_modes = []
     rows_patterns = []
 
-    with db.cursor() as cur:
+    with closing(db.cursor()) as cur:
         sql = "SELECT * FROM lightsticks"
         cur.execute(sql)
 
         rows_lightsticks = cur.fetchall()
 
-        cur.close()
-
-    with db.cursor() as cur:
+    with closing(db.cursor()) as cur:
         sql = "SELECT * FROM modes"
         cur.execute(sql)
 
         rows_modes = cur.fetchall()
 
-        cur.close()
-
-    with db.cursor() as cur:
+    with closing(db.cursor()) as cur:
         sql = "SELECT * FROM patterns"
         cur.execute(sql)
 
         rows_patterns = cur.fetchall()
-
-        cur.close()
 
     lightsticks = {}
     modes = {}
@@ -79,10 +74,8 @@ def update(lightstick):
     field = request.form["field"]
     value = request.form["value"]
 
-    with db.cursor() as cur:
+    with closing(db.cursor()) as cur:
         cur.execute("UPDATE lightsticks SET %s = '%s' WHERE id = '%s'" % (field, value, lightstick))
-
-        cur.close()
 
     res = { "status": 200, "message": "Successfully updated lightstick." }
 
