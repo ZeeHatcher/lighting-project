@@ -2,6 +2,7 @@ import MySQLdb
 import os
 import serial
 import time
+import random
 
 from abc import ABCMeta, abstractmethod
 from dotenv import load_dotenv
@@ -30,6 +31,9 @@ class Color:
         self.r = color[:2].decode("hex")
         self.g = color[2:4].decode("hex")
         self.b = color[4:].decode("hex")
+        self.r_int = int(color[:2],16)
+        self.g_int = int(color[2:4],16)
+        self.b_int = int(color[4:],16)
 
 class Mode:
     __metaclass__ = ABCMeta
@@ -73,6 +77,8 @@ class BasicMode(Mode):
                 self._pattern = SolidPattern()
             elif new_pattern_id == 2:
                 self._pattern = DotPattern()
+            elif new_pattern_id == 4:
+                self._pattern = BreathePattern()
             elif new_pattern_id == 6:
                 self._pattern = WavePattern()
             else:
@@ -180,6 +186,40 @@ class WavePattern(Pattern):
 
         time.sleep(0.1)
 
+        return c_r, c_g, c_b
+
+class BreathePattern(Pattern):
+    def __init__(self):
+        self._i = 0
+        self._fade_in = True
+
+    def render(self):
+        colors = self._get_colors()
+
+        color = colors[0] if len(colors) > 0 and len(colors[0]) == 6 else "000000"
+                
+        int_r = int(color[:2],16) * self._i
+        int_g = int(color[2:4],16) * self._i
+        int_b = int(color[4:],16) * self._i
+        
+        if self._fade_in:
+            self._i += 0.1
+        else:
+            self._i -= 0.1
+        
+        if self._i >= 1.0 and self._fade_in:
+            self._i = 1.0
+            self._fade_in = False
+            
+        if self._i <= 0.0 and not self._fade_in:
+            self._i = 0.0
+            self._fade_in = True
+            
+        c_r = [("{:02x}".format(int(int_r))).decode("hex")] * NUM_PIXELS
+        c_g = [("{:02x}".format(int(int_g))).decode("hex")] * NUM_PIXELS
+        c_b = [("{:02x}".format(int(int_b))).decode("hex")] * NUM_PIXELS
+        time.sleep(0.1)
+        
         return c_r, c_g, c_b
 
 db = MySQLdb.connect(DB_HOST, DB_USERNAME, DB_PASSWORD, DB_DATABASE) or die("Could not connect to database")
