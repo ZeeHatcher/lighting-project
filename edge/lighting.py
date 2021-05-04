@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from awscrt import auth, io, mqtt, http
 from awsiot import iotshadow
 from awsiot import mqtt_connection_builder
@@ -59,9 +59,7 @@ class Color:
         self.g = int(color[2:4], 16)
         self.b = int(color[4:], 16)
 
-class Mode:
-    __metaclass__ = ABCMeta
-
+class Mode(ABC):
     @abstractmethod
     def run(self):
         pass
@@ -100,9 +98,7 @@ class BasicMode(Mode):
 
             self._pattern_id = new_pattern_id
 
-class Pattern:
-    __metaclass__ = ABCMeta
-
+class Pattern(ABC):
     @abstractmethod
     def render(self):
         pass
@@ -220,8 +216,6 @@ class BreathePattern(Pattern):
         time.sleep(0.1)
         
         return c_r, c_g, c_b
-
-
 
 # Function for gracefully quitting
 def exit(msg_or_exception):
