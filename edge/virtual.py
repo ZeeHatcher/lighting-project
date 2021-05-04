@@ -32,9 +32,9 @@ class VirtualLightstick:
     def update(self, c_r, c_g, c_b):
         for i in range(self._num_pixels):
             color = color_rgb(
-                int(c_r[i].encode("hex"), 16),
-                int(c_g[i].encode("hex"), 16),
-                int(c_b[i].encode("hex"), 16)
+                c_r[i],
+                c_g[i],
+                c_b[i]
             )
 
             pixel = self._pixels[i]
