@@ -5,5 +5,5 @@
 1. Setup AWS SDK, using [this guide](https://docs.aws.amazon.com/iot/latest/developerguide/connecting-to-existing-device.html).
 1. Setup required Python dependencies:
    1. Run `python3 -m pip install python-dotenv`
-1. Copy `.env\_example` into a new file called `.env`
+1. Copy `.env_example` into a new file called `.env`
 1. Update values inside `.env` to work with your environment
