@@ -17,6 +17,14 @@ h2, h3, h4, h5, h6 {
   display: none
 }
 
+#lightstick {
+  transition: color 0.15s ease-in-out;
+}
+
+#lightstick:hover {
+  color: #e5f7ef;
+}
+
 .btn-grid .btn {
   width: 100%;
 }

@@ -21,7 +21,7 @@
         <header>
           {% set first = lightsticks[0] %}
           <div class="row">
-            <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2" data-i={{ 0 }}>0</span></h1>
+            <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2">{{ first.name[10:] }}</span></h1>
             <div class="col-6">
               <div class="row">
                 <div class="col d-flex justify-content-end align-items-center">
@@ -103,25 +103,20 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
     <script>
       $(document).ready(function() {
+        let current = 0;
         let lightsticks = {{ lightsticks|tojson }};
         let modes = {{ modes|tojson }};
         let patterns = {{ patterns|tojson }};
 
-        function getLightstickIndex() {
-          return $("#lightstick").data("i");
-        }
-
         function updateLightstick(field, value) {
           // Get lightstick ID
-          let l = getLightstickIndex();
+          lightsticks[current][field] = value;
 
-          lightsticks[l][field] = value;
-
-          console.log("NEW:", lightsticks);
+          console.log("UPDATE:", lightsticks[current]);
 
           // Send AJAX update request
           $.ajax({
-            url: "/lightstick/" + lightsticks[l]["name"],
+            url: "/lightstick/" + lightsticks[current]["name"],
             method: "POST",
             data: { field, value },
             success: function (res) {
@@ -133,45 +128,15 @@
         function onModeSwitch() {
           let modeId = $(this).data("value");
 
+          rerenderModes(modeId);
           updateLightstick("mode", modeId);
-
-          // Change "active" button
-          $("#modes .btn").removeClass("active");
-          $(this).addClass("active");
-
-          // Switch control panels
-          $("#panels > div").removeClass("d-block");
-          $("#panel-" + modes[modeId].name).addClass("d-block");
         }
 
         function onPatternSwitch() {
-          let l = getLightstickIndex();
           let patternId = $(this).data("value");
 
+          rerenderPatterns(patternId)
           updateLightstick("pattern", patternId);
-
-          // Change "active" button
-          $("#patterns .btn").removeClass("active");
-          $(this).addClass("active");
-
-          // If pattern does not need colors, disable "submit-color" button
-          let num_colors = patterns[patternId].num_colors;
-          $("#btn-submit-color").attr("disabled", num_colors == 0);
-
-          // Update color inputs
-          let colors = lightsticks[l].colors;
-
-          $("#colors").find("input[type='color']").remove();
-
-          for (let i = 0; i < num_colors; i++) {
-            let inputDOM = $("<input type='color' class='btn btn-square p-0 me-1'>");
-
-            if (i < colors.length) {
-              inputDOM.val("#" + colors[i])
-            }
-
-            $("#btn-submit-color").before(inputDOM);
-          }
         }
 
         function onColorSubmit() {
@@ -187,11 +152,23 @@
         function onPowerSwitch() {
           let isOn = $(this).is(":checked") ? true : false;
 
-          renderPowerSwitch(isOn)
+          rerenderSwitch(isOn)
           updateLightstick("is_on", isOn)
         }
 
-        function renderPowerSwitch(isOn) {
+        function onChangeLightstick() {
+          current = (current < lightsticks.length - 1) ? current + 1 : 0;
+          lightstick = lightsticks[current];
+
+          // Rerender site
+          $("#lightstick").text(lightstick.name.substring(10));
+          rerenderSwitch(lightstick.is_on);
+          rerenderModes(lightstick.mode);
+          rerenderPatterns(lightstick.pattern);
+        }
+
+        function rerenderSwitch(isOn) {
+          $("#switch-power").prop("checked", isOn);
           $("#switch-label-off").removeClass("active");
           $("#switch-label-on").removeClass("active");
           let label = (isOn) ? $("#switch-label-on") : $("#switch-label-off");
@@ -199,11 +176,47 @@
           label.addClass("active");
         }
 
+        function rerenderModes(id) {
+          // Change "active" button
+          $("#modes .btn").removeClass("active");
+          $(`#modes .btn[data-value='${id}']`).addClass("active");
+
+          // Switch control panels
+          $("#panels > div").removeClass("d-block");
+          $("#panel-" + modes[id].name).addClass("d-block");
+        }
+
+        function rerenderPatterns(id) {
+          // Change "active" button
+          $("#patterns .btn").removeClass("active");
+          $(`#patterns .btn[data-value='${id}']`).addClass("active");
+
+          // If pattern does not need colors, disable "submit-color" button
+          let num_colors = patterns[id].num_colors;
+          $("#btn-submit-color").attr("disabled", num_colors == 0);
+
+          // Update color inputs
+          let colors = lightsticks[current].colors;
+
+          $("#colors").find("input[type='color']").remove();
+
+          for (let i = 0; i < num_colors; i++) {
+            let inputDOM = $("<input type='color' class='btn btn-square p-0 me-1'>");
+
+            if (i < colors.length) {
+              inputDOM.val("#" + colors[i])
+            }
+
+            $("#btn-submit-color").before(inputDOM);
+          }
+        }
+
         // Attach click handlers
         $(document).on("click", "#modes .btn", onModeSwitch);
         $(document).on("click", "#patterns .btn", onPatternSwitch);
         $(document).on("click", "#btn-submit-color", onColorSubmit);
         $(document).on("click", "#switch-power", onPowerSwitch);
+        $(document).on("click", "#lightstick", onChangeLightstick);
       });
     </script>
   </body>
