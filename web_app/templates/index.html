@@ -19,23 +19,24 @@
     <div class="d-flex justify-content-around">
       <div class="content p-4">
         <header>
+          {% set first = lightsticks[0] %}
           <div class="row">
-            <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2" data-value={{ 1 }}>1</span></h1>
+            <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2" data-i={{ 0 }}>0</span></h1>
             <div class="col-6">
               <div class="row">
                 <div class="col d-flex justify-content-end align-items-center">
-                  <span class="fs-7 me-2">off</span>
+                  <span id="switch-label-off" class="fs-7 me-2 switch-label{% if not first.is_on %} active{% endif %}">off</span>
                   <div class="form-switch">
-                    <input id="switch-power" class="form-check-input" type="checkbox" {% if lightsticks[1].is_on %}checked{% endif %}>
+                    <input id="switch-power" class="form-check-input" type="checkbox" {% if first.is_on %}checked{% endif %}>
                   </div>
-                  <span class="fs-7">on</span>
+                  <span id="switch-label-on" class="fs-7 switch-label{% if first.is_on %} active{% endif %}">on</span>
                 </div>
               </div>
 
               <div class="row">
                 <nav id="modes" class="col d-flex justify-content-end flex-wrap">
                   {% for id, mode in modes.items() %}
-                  <div class="btn btn-text fs-7 ms-1{% if lightsticks[1].mode == id %} active{% endif %}" data-value={{ id }}>{{ mode.name }}</div>
+                  <div class="btn btn-text fs-7 ms-1{% if first.mode == id %} active{% endif %}" data-value={{ id }}>{{ mode.name }}</div>
                   {% endfor %}
                 </nav>
               </div>
@@ -44,48 +45,50 @@
         </header>
 
         <main id="panels" class="my-5">
-          <div id="panel-basic" class="{% if lightsticks[1].mode == 1 %}d-block{% endif %}">
+          <div id="panel-basic" class="{% if first.mode == 1 %}d-block{% endif %}">
             <h2 id="main-header mb-4">basic</h2>
 
             <div class="my-4">
               <h6 class="m-0">pattern</h6>
+              <p>
+                choose a lighting pattern
+              </p>
 
-              <div id="patterns" class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 gx-2 gy-2 mt-3 btn-grid">
+              <div id="patterns" class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 gx-2 gy-2 btn-grid">
                 {% for id, pattern in patterns.items() %}
-                <div class="col"><button class="btn btn-outline-dark {% if lightsticks[1].pattern == id %}active{% endif %}" data-value={{ id }}>{{ pattern.name }}</button></div>
+                <div class="col"><button class="btn btn-primary {% if first.pattern == id %}active{% endif %}" data-value={{ id }}>{{ pattern.name }}</button></div>
                 {% endfor %}
               </div>
             </div>
 
-            <h6 class="m-0">color</h6>
-            <p>
+            <div class="my-4">
+              <h6 class="m-0">color</h6>
+              <p>
               set the color(s) displayed in the pattern
-            </p>
-            <div id="colors" class="d-flex">
-              {% set colors = [] %}
-              {% if lightsticks[1].colors != None %}
-                {% set colors = lightsticks[1].colors.split(",") %}
-              {% endif %}
-              {% for i in range(patterns[lightsticks[1].pattern].num_colors) %}
-              <input type="color" class="btn btn-square p-0 me-1"{% if i < colors|length %}value="#{{ colors[i] }}"{% endif %}>
-              {% endfor %}
-              <button id="btn-submit-color" class="btn btn-primary"{% if patterns[lightsticks[1].pattern].num_colors == 0 %}disabled{% endif %}>submit</button>
+              </p>
+
+              <div id="colors" class="d-flex">
+                {% for i in range(patterns[first.pattern].num_colors) %}
+                <input type="color" class="btn btn-square p-0 me-1"{% if i < first.colors|length %}value="#{{ first.colors[i] }}"{% endif %}>
+                {% endfor %}
+                <button id="btn-submit-color" class="btn btn-primary"{% if patterns[first.pattern].num_colors == 0 %}disabled{% endif %}>submit</button>
+              </div>
             </div>
           </div>
 
-          <div id="panel-image" class="{% if lightsticks[1].mode == 2 %}d-block{% endif %}">
+          <div id="panel-image" class="{% if first.mode == 2 %}d-block{% endif %}">
             <h2 id="main-header mb-4">image</h2>
           </div>
 
-          <div id="panel-audio" class="{% if lightsticks[1].mode == 3 %}d-block{% endif %}">
+          <div id="panel-audio" class="{% if first.mode == 3 %}d-block{% endif %}">
             <h2 id="main-header mb-4">audio</h2>
           </div>
 
-          <div id="panel-microphone" class="{% if lightsticks[1].mode == 4 %}d-block{% endif %}">
+          <div id="panel-microphone" class="{% if first.mode == 4 %}d-block{% endif %}">
             <h2 id="main-header mb-4">microphone</h2>
           </div>
 
-          <div id="panel-lightsaber" class="{% if lightsticks[1].mode == 5 %}d-block{% endif %}">
+          <div id="panel-lightsaber" class="{% if first.mode == 5 %}d-block{% endif %}">
             <h2 id="main-header mb-4">lightsaber</h2>
           </div>
         </main>
@@ -104,15 +107,21 @@
         let modes = {{ modes|tojson }};
         let patterns = {{ patterns|tojson }};
 
+        function getLightstickIndex() {
+          return $("#lightstick").data("i");
+        }
+
         function updateLightstick(field, value) {
           // Get lightstick ID
-          let lightstickId = $("#lightstick").data("value");
+          let l = getLightstickIndex();
 
-          lightsticks[lightstickId][field] = value;
+          lightsticks[l][field] = value;
+
+          console.log("NEW:", lightsticks);
 
           // Send AJAX update request
           $.ajax({
-            url: "/lightstick/" + lightstickId,
+            url: "/lightstick/" + lightsticks[l]["name"],
             method: "POST",
             data: { field, value },
             success: function (res) {
@@ -136,7 +145,7 @@
         }
 
         function onPatternSwitch() {
-          let lightstickId = $("#lightstick").data("value");
+          let l = getLightstickIndex();
           let patternId = $(this).data("value");
 
           updateLightstick("pattern", patternId);
@@ -150,10 +159,7 @@
           $("#btn-submit-color").attr("disabled", num_colors == 0);
 
           // Update color inputs
-          let colors = [];
-          if (lightsticks[lightstickId].colors != null) {
-            colors = lightsticks[lightstickId].colors.split(",")
-          }
+          let colors = lightsticks[l].colors;
 
           $("#colors").find("input[type='color']").remove();
 
@@ -174,14 +180,23 @@
             return $(this).val().substring(1);
           })
             .get()
-            .join(",");
 
           updateLightstick("colors", colors);
         }
 
         function onPowerSwitch() {
-          let is_on = $(this).is(":checked") ? 1 : 0;
-          updateLightstick("is_on", is_on)
+          let isOn = $(this).is(":checked") ? true : false;
+
+          renderPowerSwitch(isOn)
+          updateLightstick("is_on", isOn)
+        }
+
+        function renderPowerSwitch(isOn) {
+          $("#switch-label-off").removeClass("active");
+          $("#switch-label-on").removeClass("active");
+          let label = (isOn) ? $("#switch-label-on") : $("#switch-label-off");
+
+          label.addClass("active");
         }
 
         // Attach click handlers

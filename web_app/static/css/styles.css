@@ -1,5 +1,16 @@
 body {
   font-family: 'Roboto Mono', monospace;
+  background-color: #262a33;
+  color: #e5f7ef;
+  cursor: default;
+}
+
+h1 {
+  color: #43ffaf;
+}
+
+h2, h3, h4, h5, h6 {
+  color: #526777;
 }
 
 #panels > div {
@@ -10,23 +21,46 @@ body {
   width: 100%;
 }
 
-.btn-text {
-  padding: 0;
-  border: 0;
-  color: #cccccc;
+.btn-primary, .btn-primary:disabled, .btn-primary:focus {
+  color: #e5f7ef; 
+  background-color: rgba(0, 0, 0, 0.1);
+  border: none;
 }
 
-.btn-text.active {
-  color: #000000;
+.btn-primary.active, .btn-primary:active {
+  background-color: #43ffaf;
+  color: #262a33;
+  border: none
 }
 
-.btn-text:hover {
-  color: #000000;
+.btn-primary:hover, .btn-primary.active:hover {
+  background-color: #e5f7ef;
+  color: #262a33;
+}
+
+.btn-primary:focus, .btn-primary.active:focus {
+  box-shadow: none;
 }
 
 .btn-square {
   width: 38px;
   height: 38px;
+  border: solid 1px #e5f7ef;
+  border-radius: 0px;
+}
+
+.btn-text {
+  padding: 0;
+  border: 0;
+  color: #526777;
+}
+
+.btn-text.active {
+  color: #43ffaf;
+}
+
+.btn-text:hover {
+  color: #e5f7ef;
 }
 
 .content {
@@ -39,6 +73,31 @@ body {
   cursor: pointer;
 }
 
+.form-check-input, .form-check-input:checked, .form-check-input:focus {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-color: transparent;
+}
+
+.form-switch .form-check-input, .form-switch .form-check-input:focus, .form-switch .form-check-input:checked {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28229, 247, 239, 1%29'/%3e%3c/svg%3e");
+}
+
+/*.form-switch .form-check-input:checked {*/
+  /*background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%2867, 255, 175, 1%29'/%3e%3c/svg%3e");*/
+/*}*/
+
+.form-check-input:focus {
+  box-shadow: none;
+}
+
 .fs-7 {
   font-size: 0.8em;
+}
+
+.switch-label {
+  color: #526777;
+}
+
+.switch-label.active {
+  color: #43ffaf;
 }
