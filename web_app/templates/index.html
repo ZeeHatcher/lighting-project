@@ -17,7 +17,7 @@
 
   <body>
     <div class="d-flex justify-content-around">
-      <div class="content p-4">
+      <div id="content" class="content p-4">
         <header>
           {% set first = lightsticks[0] %}
           <div class="row">
@@ -25,18 +25,18 @@
             <div class="col-6">
               <div class="row">
                 <div class="col d-flex justify-content-end align-items-center">
-                  <span id="switch-label-off" class="fs-7 me-2 switch-label{% if not first.is_on %} active{% endif %}">off</span>
+                  <span id="switch-label-off" class="fs-7 me-2 switch-label">off</span>
                   <div class="form-switch">
-                    <input id="switch-power" class="form-check-input" type="checkbox" {% if first.is_on %}checked{% endif %}>
+                    <input id="switch-power" class="form-check-input" type="checkbox">
                   </div>
-                  <span id="switch-label-on" class="fs-7 switch-label{% if first.is_on %} active{% endif %}">on</span>
+                  <span id="switch-label-on" class="fs-7 switch-label">on</span>
                 </div>
               </div>
 
               <div class="row">
                 <nav id="modes" class="col d-flex justify-content-end flex-wrap">
                   {% for id, mode in modes.items() %}
-                  <div class="btn btn-text fs-7 ms-1{% if first.mode == id %} active{% endif %}" data-value={{ id }}>{{ mode.name }}</div>
+                  <div class="btn btn-text fs-7 ms-1" data-value={{ id }} style="display: none">{{ mode.name }}</div>
                   {% endfor %}
                 </nav>
               </div>
@@ -44,8 +44,8 @@
           </div>
         </header>
 
-        <main id="panels" class="my-5">
-          <div id="panel-basic" class="{% if first.mode == 1 %}d-block{% endif %}">
+        <main id="panels" class="my-5" style="display: none;">
+          <div id="panel-basic">
             <h2 id="main-header mb-4">basic</h2>
 
             <div class="my-4">
@@ -56,7 +56,7 @@
 
               <div id="patterns" class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 gx-2 gy-2 btn-grid">
                 {% for id, pattern in patterns.items() %}
-                <div class="col"><button class="btn btn-primary {% if first.pattern == id %}active{% endif %}" data-value={{ id }}>{{ pattern.name }}</button></div>
+                <div class="col"><button class="btn btn-primary" data-value={{ id }}>{{ pattern.name }}</button></div>
                 {% endfor %}
               </div>
             </div>
@@ -68,27 +68,28 @@
               </p>
 
               <div id="colors" class="d-flex">
-                {% for i in range(patterns[first.pattern].num_colors) %}
-                <input type="color" class="btn btn-square p-0 me-1"{% if i < first.colors|length %}value="#{{ first.colors[i] }}"{% endif %}>
-                {% endfor %}
-                <button id="btn-submit-color" class="btn btn-primary"{% if patterns[first.pattern].num_colors == 0 %}disabled{% endif %}>submit</button>
+                <button id="btn-submit-color" class="btn btn-primary">submit</button>
               </div>
             </div>
           </div>
 
-          <div id="panel-image" class="{% if first.mode == 2 %}d-block{% endif %}">
+          <div id="panel-image">
             <h2 id="main-header mb-4">image</h2>
+            <div class="my-4">
+              <h6 class="m-0">upload</h6>
+              <input type="file" class="form-control-file">
+            </div>
           </div>
 
-          <div id="panel-audio" class="{% if first.mode == 3 %}d-block{% endif %}">
+          <div id="panel-audio">
             <h2 id="main-header mb-4">audio</h2>
           </div>
 
-          <div id="panel-microphone" class="{% if first.mode == 4 %}d-block{% endif %}">
+          <div id="panel-microphone">
             <h2 id="main-header mb-4">microphone</h2>
           </div>
 
-          <div id="panel-lightsaber" class="{% if first.mode == 5 %}d-block{% endif %}">
+          <div id="panel-lightsaber">
             <h2 id="main-header mb-4">lightsaber</h2>
           </div>
         </main>
@@ -103,6 +104,8 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
     <script>
       $(document).ready(function() {
+        const DURATION = 200;
+
         let current = 0;
         let lightsticks = {{ lightsticks|tojson }};
         let modes = {{ modes|tojson }};
@@ -128,14 +131,14 @@
         function onModeSwitch() {
           let modeId = $(this).data("value");
 
-          rerenderModes(modeId);
+          changeActiveMode(modeId);
           updateLightstick("mode", modeId);
         }
 
         function onPatternSwitch() {
           let patternId = $(this).data("value");
 
-          rerenderPatterns(patternId)
+          changeActivePattern(patternId)
           updateLightstick("pattern", patternId);
         }
 
@@ -152,22 +155,36 @@
         function onPowerSwitch() {
           let isOn = $(this).is(":checked") ? true : false;
 
-          rerenderSwitch(isOn)
-          updateLightstick("is_on", isOn)
+          toggleSwitch(isOn);
+          toggleBlind(isOn);
+          updateLightstick("is_on", isOn);
         }
 
         function onChangeLightstick() {
           current = (current < lightsticks.length - 1) ? current + 1 : 0;
-          lightstick = lightsticks[current];
+          let lightstick = lightsticks[current];
 
           // Rerender site
           $("#lightstick").text(lightstick.name.substring(10));
-          rerenderSwitch(lightstick.is_on);
-          rerenderModes(lightstick.mode);
-          rerenderPatterns(lightstick.pattern);
+
+          // Update site state
+          toggleBlind(lightsticks[current].is_on);
+          toggleSwitch(lightsticks[current].is_on);
+          setTimeout(function() { changeActiveMode(lightsticks[current].mode); }, DURATION);
+          setTimeout(function() { changeActivePattern(lightsticks[current].pattern); }, DURATION * 2);
         }
 
-        function rerenderSwitch(isOn) {
+        function toggleBlind(isOn) {
+          if (isOn) {
+            $("#panels").fadeIn(DURATION);
+            $("#modes .btn").fadeIn(DURATION);
+          } else {
+            $("#panels").fadeOut(DURATION);
+            $("#modes .btn").fadeOut(DURATION);
+          }
+        }
+
+        function toggleSwitch(isOn) {
           $("#switch-power").prop("checked", isOn);
           $("#switch-label-off").removeClass("active");
           $("#switch-label-on").removeClass("active");
@@ -176,17 +193,28 @@
           label.addClass("active");
         }
 
-        function rerenderModes(id) {
+        function changeActiveMode(id) {
           // Change "active" button
           $("#modes .btn").removeClass("active");
           $(`#modes .btn[data-value='${id}']`).addClass("active");
 
           // Switch control panels
-          $("#panels > div").removeClass("d-block");
-          $("#panel-" + modes[id].name).addClass("d-block");
+          let prev = $("#panels > div").filter(function () {
+            return $(this).css("display") == "block";
+          });
+
+          if (prev.length > 0) {
+            if (prev.attr("id") != "panel-" + modes[id].name) {
+              prev.fadeOut(DURATION, function() {
+                $("#panel-" + modes[id].name).fadeIn(DURATION);
+              });
+            }
+          } else {
+            $("#panel-" + modes[id].name).fadeIn(DURATION);
+          }
         }
 
-        function rerenderPatterns(id) {
+        function changeActivePattern(id) {
           // Change "active" button
           $("#patterns .btn").removeClass("active");
           $(`#patterns .btn[data-value='${id}']`).addClass("active");
@@ -195,20 +223,24 @@
           let num_colors = patterns[id].num_colors;
           $("#btn-submit-color").attr("disabled", num_colors == 0);
 
-          // Update color inputs
-          let colors = lightsticks[current].colors;
+          $("#colors > *").fadeOut(DURATION, function() {
+            // Update color inputs
+            let colors = lightsticks[current].colors;
 
-          $("#colors").find("input[type='color']").remove();
+            $("#colors").find("input[type='color']").remove();
 
-          for (let i = 0; i < num_colors; i++) {
-            let inputDOM = $("<input type='color' class='btn btn-square p-0 me-1'>");
+            for (let i = 0; i < num_colors; i++) {
+              let inputDOM = $("<input type='color' class='btn btn-square p-0 me-1' style='display: none;'>");
 
-            if (i < colors.length) {
-              inputDOM.val("#" + colors[i])
+              if (i < colors.length) {
+                inputDOM.val("#" + colors[i]);
+              }
+
+              $("#btn-submit-color").before(inputDOM);
             }
 
-            $("#btn-submit-color").before(inputDOM);
-          }
+            $("#colors > *").fadeIn(DURATION);
+          });
         }
 
         // Attach click handlers
@@ -217,6 +249,12 @@
         $(document).on("click", "#btn-submit-color", onColorSubmit);
         $(document).on("click", "#switch-power", onPowerSwitch);
         $(document).on("click", "#lightstick", onChangeLightstick);
+
+        // Set initial website state
+        toggleBlind(lightsticks[current].is_on);
+        toggleSwitch(lightsticks[current].is_on);
+        changeActiveMode(lightsticks[current].mode);
+        changeActivePattern(lightsticks[current].pattern);
       });
     </script>
   </body>
