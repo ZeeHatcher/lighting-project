@@ -15,6 +15,7 @@ import time
 import traceback
 from uuid import uuid4
 from virtual import VirtualLightstick
+from colorsys import hls_to_rgb
 
 load_dotenv()
 
@@ -92,8 +93,12 @@ class BasicMode(Mode):
                 self._pattern = SolidPattern()
             elif new_pattern_id == 2:
                 self._pattern = DotPattern()
+            elif new_pattern_id == 3:
+                self._pattern = BlinkPattern()
             elif new_pattern_id == 4:
                 self._pattern = BreathePattern()
+            elif new_pattern_id == 5:
+                self._pattern = RainbowPattern()
             elif new_pattern_id == 6:
                 self._pattern = WavePattern()
             else:
@@ -219,6 +224,58 @@ class BreathePattern(Pattern):
         time.sleep(0.1)
         
         return c_r, c_g, c_b
+    
+class BlinkPattern(Pattern):
+    def __init__(self):
+        self._all_up = True
+        self._count = 0
+        self._threshold = 3
+
+    def render(self):
+        colors = self._get_colors()
+
+        selected = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
+        
+        if self._all_up:
+            color = selected
+        else:
+            color = Color()
+        self._count += 1
+        
+        if self._count >= self._threshold:
+            self._all_up = not self._all_up
+            self._count = 0
+        
+        c_r = bytearray([color.r] * NUM_PIXELS)
+        c_g = bytearray([color.g] * NUM_PIXELS)
+        c_b = bytearray([color.b] * NUM_PIXELS)
+        time.sleep(0.1)
+        return c_r, c_g, c_b
+    
+class RainbowPattern(Pattern):
+    def __init__(self):
+        rainbow = [ hls_to_rgb(2/3 * i/(NUM_PIXELS-1), 0.5, 1) for i in range(NUM_PIXELS) ]
+        self._r_vals = []
+        self._g_vals = []
+        self._b_vals = []
+        for colors in rainbow:
+            self._r_vals.append(int(colors[0]*255))
+            self._g_vals.append(int(colors[1]*255))
+            self._b_vals.append(int(colors[2]*255))
+
+    def render(self):
+        c_r = bytearray(self._r_vals)
+        c_g = bytearray(self._g_vals)
+        c_b = bytearray(self._b_vals)
+        
+        self._r_vals.insert(0,self._r_vals.pop())
+        self._b_vals.insert(0,self._b_vals.pop())
+        self._g_vals.insert(0,self._g_vals.pop())
+        
+        time.sleep(0.1)
+                 
+        return c_r, c_g, c_b
+        
 
 # Function for gracefully quitting
 def exit(msg_or_exception):
