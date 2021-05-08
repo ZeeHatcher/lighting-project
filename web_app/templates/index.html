@@ -64,7 +64,7 @@
             <div class="my-4">
               <h6 class="m-0">color</h6>
               <p>
-              set the color(s) displayed in the pattern
+                set the color(s) displayed in the pattern
               </p>
 
               <div id="colors" class="d-flex">
@@ -77,12 +77,32 @@
             <h2 id="main-header mb-4">image</h2>
             <div class="my-4">
               <h6 class="m-0">upload</h6>
-              <input type="file" class="form-control-file">
+              <p>
+                choose an image to be displayed on the lightstick
+              </p>
+
+              <div class="text-center">
+                <input id="file-image" type="file" class="form-control-file">
+                <br>
+                <button id="btn-upload-image" class="btn btn-primary mt-3">upload</button>
+              </div>
             </div>
           </div>
 
           <div id="panel-audio">
             <h2 id="main-header mb-4">audio</h2>
+            <div class="my-4">
+              <h6 class="m-0">upload</h6>
+              <p>
+                choose an audio file to be visualized on the lightstick
+              </p>
+
+              <div class="text-center">
+                <input id="file-audio" type="file" class="form-control-file">
+                <br>
+                <button id="btn-upload-audio" class="btn btn-primary mt-3">upload</button>
+              </div>
+            </div>
           </div>
 
           <div id="panel-microphone">
@@ -112,7 +132,6 @@
         let patterns = {{ patterns|tojson }};
 
         function updateLightstick(field, value) {
-          // Get lightstick ID
           lightsticks[current][field] = value;
 
           console.log("UPDATE:", lightsticks[current]);
@@ -125,6 +144,23 @@
             success: function (res) {
               console.log(res);
             },
+          });
+        }
+
+        function uploadFile(file) {
+          let fd = new FormData();
+          fd.append("file", file);
+          console.log(file);
+
+          $.ajax({
+            url: `/lightstick/${lightsticks[current]["name"]}/upload`,
+            method: "POST",
+            data: fd,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+              console.log(res);
+            }
           });
         }
 
@@ -161,17 +197,29 @@
         }
 
         function onChangeLightstick() {
-          current = (current < lightsticks.length - 1) ? current + 1 : 0;
-          let lightstick = lightsticks[current];
+          if (lightsticks.length > 1) {
+            current = (current < lightsticks.length - 1) ? current + 1 : 0;
+            let lightstick = lightsticks[current];
 
-          // Rerender site
-          $("#lightstick").text(lightstick.name.substring(10));
+            // Rerender site
+            $("#lightstick").text(lightstick.name.substring(10));
 
-          // Update site state
-          toggleBlind(lightsticks[current].is_on);
-          toggleSwitch(lightsticks[current].is_on);
-          setTimeout(function() { changeActiveMode(lightsticks[current].mode); }, DURATION);
-          setTimeout(function() { changeActivePattern(lightsticks[current].pattern); }, DURATION * 2);
+            // Update site state
+            toggleBlind(lightsticks[current].is_on);
+            toggleSwitch(lightsticks[current].is_on);
+            setTimeout(function() { changeActiveMode(lightsticks[current].mode); }, DURATION);
+            setTimeout(function() { changeActivePattern(lightsticks[current].pattern); }, DURATION * 2);
+          }
+        }
+
+        function onUploadFile(type) {
+          let inputFiles = $("#file-" + type).prop("files");
+
+          if (inputFiles.length > 0) {
+            let file = inputFiles[0];
+
+            uploadFile(file);
+          }
         }
 
         function toggleBlind(isOn) {
@@ -249,6 +297,8 @@
         $(document).on("click", "#btn-submit-color", onColorSubmit);
         $(document).on("click", "#switch-power", onPowerSwitch);
         $(document).on("click", "#lightstick", onChangeLightstick);
+        $(document).on("click", "#btn-upload-image", function() { onUploadFile("image"); });
+        $(document).on("click", "#btn-upload-audio", function() { onUploadFile("audio"); });
 
         // Set initial website state
         toggleBlind(lightsticks[current].is_on);

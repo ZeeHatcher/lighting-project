@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from awscrt import auth, io, mqtt, http
 from awsiot import iotshadow
 from awsiot import mqtt_connection_builder
+import boto3
 from concurrent.futures import Future
 from dotenv import load_dotenv
 import json
@@ -17,13 +18,13 @@ from virtual import VirtualLightstick
 
 load_dotenv()
 
-LIGHTSTICK_ID = os.environ.get("LIGHTSTICK_ID")
 NUM_PIXELS = int(os.environ.get("NUM_PIXELS"))
 BAUD_RATE = int(os.environ.get("BAUD_RATE"))
 SERIAL_CONN = os.environ.get("SERIAL_CONN")
 
 CERT_DIR = "./.certs/"
 CLIENT_ID = os.environ.get("CLIENT_ID") or str(uuid4())
+S3_BUCKET = os.environ.get("S3_BUCKET")
 THING_NAME = os.environ.get("THING_NAME")
 
 ser = None
@@ -44,7 +45,9 @@ class LockedData:
             "is_on": False,
             "mode": 0,
             "pattern": 0,
-            "colors": []
+            "colors": [],
+            "upload_image": 0,
+            "upload_audio": 0,
         }
 
 locked_data = LockedData()
@@ -245,18 +248,22 @@ def on_get_shadow_accepted(response):
             print("  Shadow reported state: ", end="")
             print(json.dumps(response.state.reported))
 
-            with locked_data.lock:
-                locked_data.shadow_state = response.state.reported
+            change_local_state(response.state.reported)
         else:
             is_update = True
 
         if response.state.delta:
+            delta = response.state.delta
             print("  Shadow delta: ", end="")
-            print(json.dumps(response.state.delta))
+            print(json.dumps(delta))
 
-            with locked_data.lock:
-                for p in response.state.delta:
-                    locked_data.shadow_state[p] = response.state.delta[p]
+            change_local_state(delta)
+
+            if ("upload_image" in delta):
+                start_download_thread("image")
+
+            if ("upload_audio" in delta):
+                start_download_thread("audio")
 
             is_update = True
 
@@ -285,9 +292,13 @@ def on_shadow_delta_updated(delta):
             print("  Delta reports desired values are: ", end="")
             print(json.dumps(delta.state))
 
-            with locked_data.lock:
-                for p in delta.state:
-                    locked_data.shadow_state[p] = delta.state[p]
+            change_local_state(delta.state)
+
+            if ("upload_image" in delta.state):
+                start_download_thread("image")
+
+            if ("upload_audio" in delta.state):
+                start_download_thread("audio")
 
             change_shadow_state()
         else:
@@ -317,6 +328,23 @@ def on_update_shadow_rejected(error):
     # type: (iotshadow.ErrorResponse) -> None
     exit("Update request was rejected. code:{} message:'{}'".format(
         error.code, error.message))
+
+def change_local_state(new_state):
+    with locked_data.lock:
+        for p in new_state:
+            locked_data.shadow_state[p] = new_state[p]
+
+def download_file(file_type):
+    s3 = boto3.client("s3")
+    key = THING_NAME + "/" + file_type
+
+    print("Downloading %s..." % file_type)
+    s3.download_file(S3_BUCKET, key, file_type)
+    print("Finished downloading %s." % file_type)
+
+def start_download_thread(file_type):
+    thread = threading.Thread(target=download_file, args=(file_type,))
+    thread.start()
 
 def change_shadow_state():
     print("Updating reported shadow value.")

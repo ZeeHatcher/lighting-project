@@ -6,7 +6,9 @@ import json
 import MySQLdb
 import os
 import sys
+import threading
 import traceback
+from werkzeug import secure_filename
 
 load_dotenv()
 
@@ -14,10 +16,9 @@ DB_HOST = os.environ.get("DB_HOST")
 DB_USERNAME = os.environ.get("DB_USERNAME")
 DB_PASSWORD = os.environ.get("DB_PASSWORD")
 DB_DATABASE = os.environ.get("DB_DATABASE")
+S3_BUCKET = os.environ.get("S3_BUCKET")
 
 app = Flask(__name__)
-iot = boto3.client("iot")
-iot_data = boto3.client("iot-data")
 
 def request_has_connection():
     return hasattr(g, "db")
@@ -33,6 +34,8 @@ def get_request_connection():
 
 @app.route("/")
 def index():
+    iot = boto3.client("iot")
+    iot_data = boto3.client("iot-data")
     db = get_request_connection()
 
     rows_modes = []
@@ -64,7 +67,7 @@ def index():
             state = payload["state"]["reported"]
             state["name"] = thing
 
-            lightsticks.append(state)
+            lightsticks.insert(0, state)
 
     print(lightsticks)
     for row in rows_modes:
@@ -84,6 +87,8 @@ def index():
 
 @app.route("/lightstick/<name>", methods=["POST"])
 def update(name):
+    iot_data = boto3.client("iot-data")
+
     field = request.form["field"]
     value = None
 
@@ -107,6 +112,27 @@ def update(name):
     # print(response)
 
     res = { "status": 200, "message": "Successfully updated lightstick shadow." }
+
+    return jsonify(res)
+
+@app.route("/lightstick/<name>/upload", methods=["POST"])
+def upload(name):
+    s3 = boto3.client("s3")
+
+    f = request.files["file"]
+
+    file_type = f.content_type.split("/")[0]
+    f.filename = name + "/" + file_type
+
+    try:
+        s3.upload_fileobj(f, S3_BUCKET, f.filename)
+    except Exception as e:
+        print("Something happened: ", e)
+
+        res = { "status": 400, "message": "Something went wrong on the server." }
+        return jsonify(res)
+
+    res = { "status": 200, "message": "Successfully uploaded file." }
 
     return jsonify(res)
 
