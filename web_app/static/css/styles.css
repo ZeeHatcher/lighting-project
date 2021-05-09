@@ -81,6 +81,10 @@ h2, h3, h4, h5, h6 {
   cursor: pointer;
 }
 
+.fill {
+  min-height: 100vh;
+}
+
 .form-check-input, .form-check-input:checked, .form-check-input:focus {
   background-color: rgba(0, 0, 0, 0.1);
   border-color: transparent;

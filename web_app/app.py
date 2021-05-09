@@ -8,7 +8,7 @@ import os
 import sys
 import threading
 import traceback
-from werkzeug import secure_filename
+from werkzeug import secure_filename, abort
 
 load_dotenv()
 
@@ -18,7 +18,10 @@ DB_PASSWORD = os.environ.get("DB_PASSWORD")
 DB_DATABASE = os.environ.get("DB_DATABASE")
 S3_BUCKET = os.environ.get("S3_BUCKET")
 
+MIME_TYPES = ["image/jpeg", "image/png", "audio/mpeg", "audio/wav"]
+
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024 # 1MB maximum file size
 
 def request_has_connection():
     return hasattr(g, "db")
@@ -99,8 +102,10 @@ def update(name):
     elif field == "colors":
         value = request.form.getlist("value[]")
     else:
-        res = jsonify({ "status": 400, "message": "Could not get appropriate form value" })
-        return res
+        abort(400)
+
+    if (value == None):
+        abort(400)
 
     desired = {}
     desired[field] = value
@@ -120,6 +125,9 @@ def upload(name):
     s3 = boto3.client("s3")
 
     f = request.files["file"]
+
+    if (f.content_type not in MIME_TYPES):
+        abort(400)
 
     file_type = f.content_type.split("/")[0]
     f.filename = name + "/" + file_type

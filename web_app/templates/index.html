@@ -16,12 +16,12 @@
   </head>
 
   <body>
+    {% if lightsticks|length > 0 %}
     <div class="d-flex justify-content-around">
       <div id="content" class="content p-4">
         <header>
-          {% set first = lightsticks[0] %}
           <div class="row">
-            <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2">{{ first.name[10:] }}</span></h1>
+            <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2"></span></h1>
             <div class="col-6">
               <div class="row">
                 <div class="col d-flex justify-content-end align-items-center">
@@ -82,7 +82,7 @@
               </p>
 
               <div class="text-center">
-                <input id="file-image" type="file" class="form-control-file">
+                <input id="file-image" accept="image/jpeg, image/png" type="file" class="form-control-file">
                 <br>
                 <button id="btn-upload-image" class="btn btn-primary mt-3">upload</button>
               </div>
@@ -98,7 +98,7 @@
               </p>
 
               <div class="text-center">
-                <input id="file-audio" type="file" class="form-control-file">
+                <input id="file-audio" accept="audio/mpeg, audio/wav" type="file" class="form-control-file">
                 <br>
                 <button id="btn-upload-audio" class="btn btn-primary mt-3">upload</button>
               </div>
@@ -125,25 +125,36 @@
     <script>
       $(document).ready(function() {
         const DURATION = 200;
+        const FILE_SIZE_LIMIT = 1000000 // File size limit of 1MB
+        const MIME_TYPES = {
+          image: ["image/jpeg", "image/png"],
+          audio: ["audio/mpeg", "audio/wav"]
+        }
 
-        let current = 0;
         let lightsticks = {{ lightsticks|tojson }};
         let modes = {{ modes|tojson }};
         let patterns = {{ patterns|tojson }};
 
-        function updateLightstick(field, value) {
-          lightsticks[current][field] = value;
+        let currentIndex = 0;
+        let current = lightsticks[currentIndex];
 
-          console.log("UPDATE:", lightsticks[current]);
+        function updateLightstick(field, value) {
+          current[field] = value;
+
+          console.log("UPDATE:", current);
 
           // Send AJAX update request
           $.ajax({
-            url: "/lightstick/" + lightsticks[current]["name"],
+            url: "/lightstick/" + current["name"],
             method: "POST",
             data: { field, value },
             success: function (res) {
               console.log(res);
             },
+            error: function (err) {
+              console.log(err);
+              alert("Something went wrong on the server...");
+            }
           });
         }
 
@@ -153,29 +164,43 @@
           console.log(file);
 
           $.ajax({
-            url: `/lightstick/${lightsticks[current]["name"]}/upload`,
+            url: `lightstick/${current["name"]}/upload`,
             method: "POST",
             data: fd,
             processData: false,
             contentType: false,
             success: function(res) {
               console.log(res);
+            },
+            error: function (err) {
+              console.log(err);
+              alert("Something went wrong on the server...");
             }
           });
         }
 
         function onModeSwitch() {
-          let modeId = $(this).data("value");
+          let id = $(this).data("value");
 
-          changeActiveMode(modeId);
-          updateLightstick("mode", modeId);
+          if (!(id in modes)) {
+            alert("Invalid mode.")
+            return;
+          }
+
+          changeActiveMode(id);
+          updateLightstick("mode", id);
         }
 
         function onPatternSwitch() {
-          let patternId = $(this).data("value");
+          let id = $(this).data("value");
 
-          changeActivePattern(patternId)
-          updateLightstick("pattern", patternId);
+          if (!(id in patterns)) {
+            alert("Invalid pattern.")
+            return;
+          }
+
+          changeActivePattern(id)
+          updateLightstick("pattern", id);
         }
 
         function onColorSubmit() {
@@ -198,28 +223,41 @@
 
         function onChangeLightstick() {
           if (lightsticks.length > 1) {
-            current = (current < lightsticks.length - 1) ? current + 1 : 0;
-            let lightstick = lightsticks[current];
+            currentIndex = (currentIndex < lightsticks.length - 1) ? currentIndex + 1 : 0;
+            current = lightsticks[currentIndex];
 
             // Rerender site
-            $("#lightstick").text(lightstick.name.substring(10));
+            $("#lightstick").text(current.name.substring(10));
 
             // Update site state
-            toggleBlind(lightsticks[current].is_on);
-            toggleSwitch(lightsticks[current].is_on);
-            setTimeout(function() { changeActiveMode(lightsticks[current].mode); }, DURATION);
-            setTimeout(function() { changeActivePattern(lightsticks[current].pattern); }, DURATION * 2);
+            toggleBlind(current.is_on);
+            toggleSwitch(current.is_on);
+            setTimeout(function() { changeActiveMode(current.mode); }, DURATION);
+            setTimeout(function() { changeActivePattern(current.pattern); }, DURATION * 2);
           }
         }
 
         function onUploadFile(type) {
           let inputFiles = $("#file-" + type).prop("files");
 
-          if (inputFiles.length > 0) {
-            let file = inputFiles[0];
-
-            uploadFile(file);
+          if (inputFiles.length <= 0) {
+            alert("No file selected.");
+            return;
           }
+
+          let file = inputFiles[0];
+
+          if (!MIME_TYPES[type].includes(file["type"])) {
+            alert("Invalid file type.");
+            return;
+          }
+
+          if (file["size"] > FILE_SIZE_LIMIT) {
+            alert(`File size is too large (greater than ${FILE_SIZE_LIMIT}).`)
+            return;
+          }
+
+          uploadFile(file);
         }
 
         function toggleBlind(isOn) {
@@ -273,7 +311,7 @@
 
           $("#colors > *").fadeOut(DURATION, function() {
             // Update color inputs
-            let colors = lightsticks[current].colors;
+            let colors = current.colors;
 
             $("#colors").find("input[type='color']").remove();
 
@@ -301,11 +339,21 @@
         $(document).on("click", "#btn-upload-audio", function() { onUploadFile("audio"); });
 
         // Set initial website state
-        toggleBlind(lightsticks[current].is_on);
-        toggleSwitch(lightsticks[current].is_on);
-        changeActiveMode(lightsticks[current].mode);
-        changeActivePattern(lightsticks[current].pattern);
+        $("#lightstick").text(current.name.substring(10));
+        toggleBlind(current.is_on);
+        toggleSwitch(current.is_on);
+        changeActiveMode(current.mode);
+        changeActivePattern(current.pattern);
       });
     </script>
+    {% else %}
+    <div class="d-flex justify-content-around align-items-center fill">
+      <p class="text-center m-5">
+        No lightsticks found.
+        <br>
+        Please register one in AWS IoT Core and then refresh this page.
+      </p>
+    </div>
+    {% endif %}
   </body>
 </html>
