@@ -3,7 +3,6 @@ from contextlib import closing
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, g
 import json
-import MySQLdb
 import os
 import sys
 import threading
@@ -12,53 +11,34 @@ from werkzeug import secure_filename, abort
 
 load_dotenv()
 
-DB_HOST = os.environ.get("DB_HOST")
-DB_USERNAME = os.environ.get("DB_USERNAME")
-DB_PASSWORD = os.environ.get("DB_PASSWORD")
-DB_DATABASE = os.environ.get("DB_DATABASE")
 S3_BUCKET = os.environ.get("S3_BUCKET")
 
 MIME_TYPES = ["image/jpeg", "image/png", "audio/mpeg", "audio/wav"]
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024 # 1MB maximum file size
-
-def request_has_connection():
-    return hasattr(g, "db")
-
-def get_request_connection():
-    if not request_has_connection():
-        db = MySQLdb.connect(DB_HOST, DB_USERNAME, DB_PASSWORD, DB_DATABASE)
-        db.autocommit(True)
-
-        g.db = db
-
-    return g.db
+app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024 # 1MB maximum file size
 
 @app.route("/")
 def index():
     iot = boto3.client("iot")
     iot_data = boto3.client("iot-data")
-    db = get_request_connection()
-
-    rows_modes = []
-    rows_patterns = []
-
-    with closing(db.cursor()) as cur:
-        sql = "SELECT * FROM modes"
-        cur.execute(sql)
-
-        rows_modes = cur.fetchall()
-
-    with closing(db.cursor()) as cur:
-        sql = "SELECT * FROM patterns"
-        cur.execute(sql)
-
-        rows_patterns = cur.fetchall()
+    dynamodb = boto3.resource("dynamodb")
 
     lightsticks = []
     modes = {}
     patterns = {}
+
+    table_modes = dynamodb.Table("modes")
+    items = table_modes.scan()["Items"]
+    items = sorted(items, key=lambda k: k["id"])
+    for item in items:
+        modes[int(items["id"])] = item
+
+    table_patterns = dynamodb.Table("patterns")
+    items = table_patterns.scan()["Items"]
+    items = sorted(items, key=lambda k: k["id"])
+    for item in items:
+        patterns[int(items["id"])] = item
 
     res_things = iot.list_things_in_thing_group(thingGroupName='lightsticks')
     for thing in res_things["things"]:
@@ -71,20 +51,6 @@ def index():
             state["name"] = thing
 
             lightsticks.insert(0, state)
-
-    print(lightsticks)
-    for row in rows_modes:
-        mode, name = row
-        modes[mode] = {
-            "name": name
-        }
-
-    for row in rows_patterns:
-        pattern, name, num_colors = row
-        patterns[pattern] = {
-            "name": name,
-            "num_colors": num_colors
-        }
 
     return render_template("index.html", lightsticks=lightsticks, modes=modes, patterns=patterns)
 
@@ -113,8 +79,8 @@ def update(name):
     payload = { "state": { "desired": desired } }
     byte_str = json.dumps(payload)
 
-    # response = iot_data.update_thing_shadow(thingName=name, payload=byte_str)
-    # print(response)
+    response = iot_data.update_thing_shadow(thingName=name, payload=byte_str)
+    print(response)
 
     res = { "status": 200, "message": "Successfully updated lightstick shadow." }
 
@@ -122,7 +88,8 @@ def update(name):
 
 @app.route("/lightstick/<name>/upload", methods=["POST"])
 def upload(name):
-    s3 = boto3.client("s3")
+    s3 = boto3.resource("s3")
+    bucket = s3.Bucket(S3_BUCKET)
 
     f = request.files["file"]
 
@@ -133,7 +100,7 @@ def upload(name):
     f.filename = name + "/" + file_type
 
     try:
-        s3.upload_fileobj(f, S3_BUCKET, f.filename)
+        bucket.upload_fileobj(f, f.filename)
     except Exception as e:
         print("Something happened: ", e)
 
@@ -143,13 +110,6 @@ def upload(name):
     res = { "status": 200, "message": "Successfully uploaded file." }
 
     return jsonify(res)
-
-@app.teardown_request
-def exit(ex):
-    if request_has_connection():
-        print("Terminating database connection...")
-        db = get_request_connection()
-        db.close()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
