@@ -1,4 +1,5 @@
 import boto3
+from boto3.dynamodb.conditions import Key
 from contextlib import closing
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, g
@@ -9,37 +10,35 @@ import threading
 import traceback
 from werkzeug import secure_filename, abort
 
-load_dotenv()
-
-S3_BUCKET = os.environ.get("S3_BUCKET")
-
-MIME_TYPES = ["image/jpeg", "image/png", "audio/mpeg", "audio/wav"]
-
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024 # 1MB maximum file size
 
 @app.route("/")
 def index():
+    # Clients to access AWS services
+    dynamodb = boto3.resource("dynamodb")
     iot = boto3.client("iot")
     iot_data = boto3.client("iot-data")
-    dynamodb = boto3.resource("dynamodb")
 
     lightsticks = []
     modes = {}
     patterns = {}
 
+    # Get modes from DynamoDB and format into dict
     table_modes = dynamodb.Table("modes")
     items = table_modes.scan()["Items"]
     items = sorted(items, key=lambda k: k["id"])
     for item in items:
-        modes[int(items["id"])] = item
+        modes[int(item["id"])] = item
 
+    # Get patterns from DynamoDB and format into dict
     table_patterns = dynamodb.Table("patterns")
     items = table_patterns.scan()["Items"]
     items = sorted(items, key=lambda k: k["id"])
     for item in items:
-        patterns[int(items["id"])] = item
+        patterns[int(item["id"])] = item
 
+    # Get list of lightsticks and get reported shadow state
     res_things = iot.list_things_in_thing_group(thingGroupName='lightsticks')
     for thing in res_things["things"]:
         res_shadow = iot_data.get_thing_shadow(thingName=thing)
@@ -53,6 +52,35 @@ def index():
             lightsticks.insert(0, state)
 
     return render_template("index.html", lightsticks=lightsticks, modes=modes, patterns=patterns)
+
+@app.route("/lightstick/<name>/data")
+def get_sensors_data(name):
+    dynamodb = boto3.resource("dynamodb")
+    table = dynamodb.Table("sensors_data")
+
+    response = table.query(
+        KeyConditionExpression=Key("thing_name").eq(name))
+
+    x = []
+    y = []
+
+    items = response["Items"]
+    for item in items:
+        x.append({
+            "value": item["data"]["x"],
+            "timestamp": item["timestamp"]
+        })
+        y.append({
+            "value": item["data"]["y"],
+            "timestamp": item["timestamp"]
+        })
+
+    res = {
+        "x": x,
+        "y": y
+    }
+
+    return jsonify(res)
 
 @app.route("/lightstick/<name>", methods=["POST"])
 def update(name):
@@ -112,4 +140,11 @@ def upload(name):
     return jsonify(res)
 
 if __name__ == "__main__":
+    # Load .env file for development
+    load_dotenv()
+
+    # Constants
+    MIME_TYPES = ["image/jpeg", "image/png", "audio/mpeg", "audio/wav"]
+    S3_BUCKET = os.environ.get("S3_BUCKET")
+
     app.run(host="0.0.0.0", port=5000, debug=True)

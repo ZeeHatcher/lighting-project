@@ -111,6 +111,22 @@
 
           <div id="panel-lightsaber">
             <h2 id="main-header mb-4">lightsaber</h2>
+
+            <div class="my-4">
+              <h6 class="m-0">sensors</h6>
+              <p>
+                graphical visualisation of sensors data
+              </p>
+
+              <div class="row row-cols-1 row-cols-md-2 gx-5 gy-5">
+                <div>
+                  <canvas id="chart-x"></canvas>
+                </div>
+                <div>
+                  <canvas id="chart-y"></canvas>
+                </div>
+              </div>
+            </div>
           </div>
         </main>
 
@@ -120,6 +136,8 @@
     </div>
 
     <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.2.0/chart.min.js" integrity="sha512-VMsZqo0ar06BMtg0tPsdgRADvl0kDHpTbugCBBrL55KmucH6hP9zWdLIWY//OTfMnzz6xWQRxQqsUFefwHuHyg==" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@next/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js" integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
     <script>
@@ -137,6 +155,35 @@
 
         let currentIndex = 0;
         let current = lightsticks[currentIndex];
+
+        let intervalId = null;
+
+        function stopInterval(id) {
+          if (id != null) {
+            clearInterval(id);
+          }
+
+          return null;
+        }
+
+        function getSensorsData() {
+          $.ajax({
+            url: "/lightstick/" + current["name"] + "/data",
+            method: "GET",
+            success: function (res) {
+              console.log(res);
+              chartX.data.datasets[0].data = res["x"];
+              chartX.update();
+
+              chartY.data.datasets[0].data = res["y"];
+              chartY.update();
+            },
+            error: function (err) {
+              console.log(err);
+              alert("Something went wrong on the server...");
+            }
+          });
+        }
 
         function updateLightstick(field, value) {
           current[field] = value;
@@ -175,6 +222,39 @@
             error: function (err) {
               console.log(err);
               alert("Something went wrong on the server...");
+            }
+          });
+        }
+
+        function generateChart(ctx, label, data) {
+          return new Chart(ctx, {
+            type: "line",
+            data: {
+              datasets: [{
+                data: data,
+                label,
+                backgroundColor: "rgba(67, 255, 175, 0.5)",
+                borderColor: "rgb(67, 255, 175)",
+                tension: 0.3
+              }]
+            },
+            options: {
+              plugins: {
+                legend: {
+                  display: false,
+                },
+              },
+              parsing: {
+                xAxisKey: "timestamp",
+                yAxisKey: "value"
+              },
+              responsive: true,
+              <!--maintainAspectRatio: false,-->
+              scales: {
+                x: {
+                  type: "time",
+                }
+              }
             }
           });
         }
@@ -229,6 +309,8 @@
             // Rerender site
             $("#lightstick").text(current.name.substring(10));
 
+            intervalId = stopInterval(intervalId);
+
             // Update site state
             toggleBlind(current.is_on);
             toggleSwitch(current.is_on);
@@ -280,6 +362,13 @@
         }
 
         function changeActiveMode(id) {
+          if (id == 5) {
+            getSensorsData();
+            intervalId = setInterval(getSensorsData, 5000);
+          } else {
+            intervalId = stopInterval(intervalId)
+          }
+
           // Change "active" button
           $("#modes .btn").removeClass("active");
           $(`#modes .btn[data-value='${id}']`).addClass("active");
@@ -328,6 +417,10 @@
             $("#colors > *").fadeIn(DURATION);
           });
         }
+
+        // Generate charts
+        let chartX = generateChart($("#chart-x"), "x", []);
+        let chartY = generateChart($("#chart-y"), "y", []);
 
         // Attach click handlers
         $(document).on("click", "#modes .btn", onModeSwitch);

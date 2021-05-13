@@ -6,6 +6,7 @@ import boto3
 from concurrent.futures import Future
 from dotenv import load_dotenv
 import json
+from multiprocessing import Value
 import os
 import random
 import serial
@@ -68,11 +69,18 @@ class Mode(ABC):
     def run(self):
         pass
 
+    @abstractmethod
+    def exit(self):
+        pass
+
 class NullMode(Mode):
     def run(self):
         c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
 
         return c_r, c_g, c_b
+
+    def exit(self):
+        pass
 
 class BasicMode(Mode):
     def __init__(self):
@@ -83,6 +91,9 @@ class BasicMode(Mode):
         self._get_pattern()
 
         return self._pattern.render()
+
+    def exit(self):
+        pass
 
     def _get_pattern(self):
         new_pattern_id = locked_data.shadow_state["pattern"]
@@ -105,6 +116,36 @@ class BasicMode(Mode):
                 self._pattern = NullPattern()
 
             self._pattern_id = new_pattern_id
+
+class LightsaberMode(Mode):
+    def __init__(self):
+        self._thread = None
+        self.v = Value("I", 0)
+
+    def run(self):
+        if ser != None:
+            value = ser.read_until().strip()
+            self.v.value = int(value) if value else 0
+
+        if self._thread == None:
+            print("Starting publish thread...")
+            self._thread = threading.Thread(target=publish_sensors_data, args=(self.v,))
+            self._thread.start()
+
+        weight = round(self.v.value / 1023 * 255)
+
+        c_r = c_g = c_b = bytearray([weight] * NUM_PIXELS)
+
+        return c_r, c_g, c_b
+    
+    def exit(self):
+        if self._thread != None:
+            print("Stopping publish thread...")
+
+            self._thread.is_run = False
+            self._thread.join()
+
+            self._thread = None
 
 class Pattern(ABC):
     @abstractmethod
@@ -286,6 +327,9 @@ def exit(msg_or_exception):
         print("Exiting:", msg_or_exception)
 
     print("Disconnecting...")
+    if mode != None:
+        mode.exit()
+
     future = mqtt_connection.disconnect()
     future.add_done_callback(on_disconnected)
 
@@ -386,13 +430,7 @@ def on_update_shadow_rejected(error):
     exit("Update request was rejected. code:{} message:'{}'".format(
         error.code, error.message))
 
-def change_local_state(new_state):
-    with locked_data.lock:
-        for p in new_state:
-            locked_data.shadow_state[p] = new_state[p]
-
 def download_file(file_type):
-    s3 = boto3.client("s3")
     key = THING_NAME + "/" + file_type
 
     print("Downloading %s..." % file_type)
@@ -402,6 +440,33 @@ def download_file(file_type):
 def start_download_thread(file_type):
     thread = threading.Thread(target=download_file, args=(file_type,))
     thread.start()
+
+def publish_sensors_data(v):
+    print("Started publish thread.")
+
+    t = threading.currentThread()
+    while getattr(t, "is_run", True):
+        topic = "lightstick/" + THING_NAME + "/data"
+        payload = {
+            "x": v.value,
+            "y": 1 / v.value if v.value > 0 else 1
+        }
+
+        print(topic, payload)
+
+        mqtt_connection.publish(
+            topic=topic,
+            payload=json.dumps(payload),
+            qos=mqtt.QoS.AT_LEAST_ONCE)
+
+        time.sleep(5)
+
+    print("Stopped publish thread.")
+
+def change_local_state(new_state):
+    with locked_data.lock:
+        for p in new_state:
+            locked_data.shadow_state[p] = new_state[p]
 
 def change_shadow_state():
     print("Updating reported shadow value.")
@@ -426,8 +491,13 @@ def loop():
 
     # If mode has actually changed
     if new_mode_id != mode_id:
+        if mode != None:
+            mode.exit()
+
         if new_mode_id == 1:
             mode = BasicMode()
+        elif new_mode_id == 5:
+            mode = LightsaberMode()
         else:
             mode = NullMode()
 
@@ -436,6 +506,10 @@ def loop():
     c_r, c_g, c_b = mode.run()
 
     if ser != None:
+        # Clear buffers for clean input and output
+        ser.reset_input_buffer()
+        ser.reset_output_buffer()
+
         ser.write(c_r)
         ser.write(c_g)
         ser.write(c_b)
@@ -446,8 +520,9 @@ def loop():
 
 
 if __name__ == "__main__":
-    # ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
+    ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
     lightstick = VirtualLightstick(NUM_PIXELS)
+    s3 = boto3.client("s3")
 
     # Short delay to let serial setup properly
     time.sleep(1)
