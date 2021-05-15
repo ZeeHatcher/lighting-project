@@ -2,7 +2,7 @@ from graphics import *
 
 class VirtualLightstick:
     PADDING = 2
-    PIXEL_SIZE = 4
+    PIXEL_SIZE = 8
 
     def __init__(self, num_pixels):
         self._num_pixels = num_pixels
@@ -19,7 +19,7 @@ class VirtualLightstick:
         # Initialize "pixels"
         pixels = []
         y = VirtualLightstick.PADDING * VirtualLightstick.PIXEL_SIZE
-        for i in range(num_pixels):
+        for i in range(num_pixels): 
             x = (VirtualLightstick.PADDING + i) * VirtualLightstick.PIXEL_SIZE
             p1 = Point(x, y)
             p2 = Point(x + VirtualLightstick.PIXEL_SIZE, y + VirtualLightstick.PIXEL_SIZE)

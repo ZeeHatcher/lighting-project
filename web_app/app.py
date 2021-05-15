@@ -103,8 +103,8 @@ def update(name):
     payload = { "state": { "desired": desired } }
     byte_str = json.dumps(payload)
 
-    # response = iot_data.update_thing_shadow(thingName=name, payload=byte_str)
-    # print(response)
+    response = iot_data.update_thing_shadow(thingName=name, payload=byte_str)
+    print(response)
 
     res = { "status": 200, "message": "Successfully updated lightstick shadow." }
 

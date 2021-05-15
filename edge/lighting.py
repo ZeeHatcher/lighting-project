@@ -15,6 +15,9 @@ import traceback
 from uuid import uuid4
 from virtual import VirtualLightstick
 from colorsys import hls_to_rgb
+import numpy as np
+import librosa
+import pygame
 
 load_dotenv()
 
@@ -70,6 +73,40 @@ class NullMode(Mode):
         c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
 
         return c_r, c_g, c_b
+
+class MusicMode(Mode):
+    def __init__(self):
+        filename = r"/home/pi/Music/kiara.wav"
+        self._time_series, self._sample_rate = librosa.load(filename)
+        self._max_amp = np.amax(self._time_series)
+        self._time = time.time()
+        print (self._max_amp)
+        pygame.init()
+        pygame.mixer.music.load(filename)
+        pygame.mixer.music.play(0)
+
+    def run(self):
+        colors = locked_data.shadow_state["colors"]
+        color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
+        c_r = bytearray([0] * NUM_PIXELS)
+        c_g = bytearray([0] * NUM_PIXELS)
+        c_b = bytearray([0] * NUM_PIXELS)
+#         cur_time = time.time()
+        t = pygame.time.get_ticks()/1000
+#         self._time = cur_time
+        try:
+            amp = abs(self._time_series[int(t*self._sample_rate)])
+#         print(amp)
+            percentage = int((amp/self._max_amp)*NUM_PIXELS)
+#             print(percentage)
+            c_r[0:percentage] = bytearray([color.r] * percentage)
+            c_g[0:percentage] = bytearray([color.g] * percentage)
+            c_b[0:percentage] = bytearray([color.b] * percentage)
+        except IndexError:
+            c_r = bytearray([0] * NUM_PIXELS)
+            c_g = bytearray([0] * NUM_PIXELS)
+            c_b = bytearray([0] * NUM_PIXELS)
+        return c_r,c_g,c_b
 
 class BasicMode(Mode):
     def __init__(self):
@@ -251,7 +288,7 @@ class BlinkPattern(Pattern):
     
 class RainbowPattern(Pattern):
     def __init__(self):
-        rainbow = [ hls_to_rgb(2/3 * i/(NUM_PIXELS-1), 0.5, 1) for i in range(NUM_PIXELS) ]
+        rainbow = [ hls_to_rgb(1 * i/(NUM_PIXELS-1), 0.5, 1) for i in range(NUM_PIXELS) ]
         self._r_vals = []
         self._g_vals = []
         self._b_vals = []
@@ -400,6 +437,8 @@ def loop():
     if new_mode_id != mode_id:
         if new_mode_id == 1:
             mode = BasicMode()
+        elif new_mode_id == 3:
+            mode = MusicMode()
         else:
             mode = NullMode()
 
