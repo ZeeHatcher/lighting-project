@@ -5,12 +5,16 @@ body {
   cursor: default;
 }
 
-h1 {
+h1{
   color: #43ffaf;
 }
 
 h2, h3, h4, h5, h6 {
   color: #526777;
+}
+
+.coloured{
+  color:white;
 }
 
 #panels > div {
@@ -102,6 +106,10 @@ h2, h3, h4, h5, h6 {
   font-size: 0.8em;
 }
 
+.fs-9{
+  font-size: 1em;
+}
+
 .switch-label {
   color: #526777;
 }
@@ -109,3 +117,32 @@ h2, h3, h4, h5, h6 {
 .switch-label.active {
   color: #43ffaf;
 }
+
+.lightstick-sb:hover{
+    color: #43ffaf;
+}
+
+.lightstick-sb.active{
+  border-top: 2px solid #43ffaf;
+  border-bottom: 2px solid #43ffaf;
+  color: #43ffaf;
+}
+
+#sidebar{
+  width:280px;
+  transition: margin.35s ease;
+}
+
+.toggled-sb{
+  margin-left:-335px;
+}
+
+.icons{
+  font-size:2em;
+  color:white;
+}
+
+.icons:hover, .cur-ls{
+  color: #43ffaf;
+}
+
