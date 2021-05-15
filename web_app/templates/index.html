@@ -13,14 +13,32 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <!--Bootstrap icons-->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
   </head>
 
-  <body>
+  <body>		
     <div class="d-flex justify-content-around">
+      <!--Sidebar-->
+			<div id="sidebar" class="d-flex flex-column bg-dark">
+          <h3 class="p-3 coloured"><b>Lighting Project</b></h3>
+          <ul class="list-group d-flex">
+            {% for lightstick in lightsticks %}
+              <li class="lightstick-sb fs-9 py-2 px-4 list-group-action">
+                {{ lightstick.name }}
+              </li>
+            {% endfor %}
+          </ul>
+      </div>
       <div id="content" class="content p-4">
         <header>
           {% set first = lightsticks[0] %}
           <div class="row">
+            <div class="col-sm-auto">
+              <button id="toggle-sb" class="btn rounded text-end p-0">
+                <i class="bi bi-list icons"></i>
+              </button>
+            </div>
             <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2">{{ first.name[10:] }}</span></h1>
             <div class="col-6">
               <div class="row">
@@ -161,8 +179,15 @@
         }
 
         function onChangeLightstick() {
-          current = (current < lightsticks.length - 1) ? current + 1 : 0;
-          let lightstick = lightsticks[current];
+          //~ current = (current < lightsticks.length - 1) ? current + 1 : 0;
+          //~ let lightstick = lightsticks[current];
+          
+          for (i=0; i<lightsticks.length; i++){
+            if (lightsticks[i].name == this.innerText){
+              lightstick = lightsticks[i];
+              current = i;
+            }
+          }
 
           // Rerender site
           $("#lightstick").text(lightstick.name.substring(10));
@@ -172,6 +197,7 @@
           toggleSwitch(lightsticks[current].is_on);
           setTimeout(function() { changeActiveMode(lightsticks[current].mode); }, DURATION);
           setTimeout(function() { changeActivePattern(lightsticks[current].pattern); }, DURATION * 2);
+          toggleLightstick();
         }
 
         function toggleBlind(isOn) {
@@ -191,6 +217,22 @@
           let label = (isOn) ? $("#switch-label-on") : $("#switch-label-off");
 
           label.addClass("active");
+        }
+        
+        function toggleLightstick(){
+          var sb_options = document.getElementsByClassName("lightstick-sb");
+          for (i=0; i<sb_options.length; i++){
+            if(lightsticks[current].name == sb_options[i].innerText){
+              sb_options[i].classList.add("active");
+            }else{
+              sb_options[i].classList.remove("active");
+            }
+          }
+        }
+        
+        function onToggleSidebar() {
+          var sidebar = document.getElementById("sidebar");
+          sidebar.classList.toggle("toggled-sb");
         }
 
         function changeActiveMode(id) {
@@ -249,12 +291,16 @@
         $(document).on("click", "#btn-submit-color", onColorSubmit);
         $(document).on("click", "#switch-power", onPowerSwitch);
         $(document).on("click", "#lightstick", onChangeLightstick);
+        $(document).on("click", ".lightstick-sb", onChangeLightstick);
+        $(document).on("click", "#toggle-sb", onToggleSidebar);
 
         // Set initial website state
         toggleBlind(lightsticks[current].is_on);
         toggleSwitch(lightsticks[current].is_on);
         changeActiveMode(lightsticks[current].mode);
         changeActivePattern(lightsticks[current].pattern);
+        toggleLightstick();
+
       });
     </script>
   </body>
