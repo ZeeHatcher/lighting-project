@@ -2,9 +2,11 @@ from abc import ABC, abstractmethod
 from awscrt import auth, io, mqtt, http
 from awsiot import iotshadow
 from awsiot import mqtt_connection_builder
+import boto3
 from concurrent.futures import Future
 from dotenv import load_dotenv
 import json
+from multiprocessing import Value
 import os
 import random
 import serial
@@ -16,18 +18,18 @@ from uuid import uuid4
 from virtual import VirtualLightstick
 from colorsys import hls_to_rgb
 import numpy as np
-import librosa
+#import librosa
 import pygame
 
 load_dotenv()
 
-LIGHTSTICK_ID = os.environ.get("LIGHTSTICK_ID")
 NUM_PIXELS = int(os.environ.get("NUM_PIXELS"))
 BAUD_RATE = int(os.environ.get("BAUD_RATE"))
 SERIAL_CONN = os.environ.get("SERIAL_CONN")
 
 CERT_DIR = "./.certs/"
 CLIENT_ID = os.environ.get("CLIENT_ID") or str(uuid4())
+S3_BUCKET = os.environ.get("S3_BUCKET")
 THING_NAME = os.environ.get("THING_NAME")
 
 ser = None
@@ -48,7 +50,9 @@ class LockedData:
             "is_on": False,
             "mode": 0,
             "pattern": 0,
-            "colors": []
+            "colors": [],
+            "upload_image": 0,
+            "upload_audio": 0,
         }
 
 locked_data = LockedData()
@@ -68,22 +72,29 @@ class Mode(ABC):
     def run(self):
         pass
 
+    @abstractmethod
+    def exit(self):
+        pass
+
 class NullMode(Mode):
     def run(self):
         c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
 
         return c_r, c_g, c_b
 
+    def exit(self):
+        pass
+
 class MusicMode(Mode):
     def __init__(self):
         filename = r"/home/pi/Music/kiara.wav"
-        self._time_series, self._sample_rate = librosa.load(filename)
-        self._max_amp = np.amax(self._time_series)
-        self._time = time.time()
-        print (self._max_amp)
-        pygame.init()
-        pygame.mixer.music.load(filename)
-        pygame.mixer.music.play(0)
+#         self._time_series, self._sample_rate = librosa.load(filename)
+#         self._max_amp = np.amax(self._time_series)
+#         self._time = time.time()
+#         print (self._max_amp)
+#         pygame.init()
+#         pygame.mixer.music.load(filename)
+#         pygame.mixer.music.play(0)
 
     def run(self):
         colors = locked_data.shadow_state["colors"]
@@ -91,22 +102,25 @@ class MusicMode(Mode):
         c_r = bytearray([0] * NUM_PIXELS)
         c_g = bytearray([0] * NUM_PIXELS)
         c_b = bytearray([0] * NUM_PIXELS)
-#         cur_time = time.time()
-        t = pygame.time.get_ticks()/1000
-#         self._time = cur_time
-        try:
-            amp = abs(self._time_series[int(t*self._sample_rate)])
-#         print(amp)
-            percentage = int((amp/self._max_amp)*NUM_PIXELS)
-#             print(percentage)
-            c_r[0:percentage] = bytearray([color.r] * percentage)
-            c_g[0:percentage] = bytearray([color.g] * percentage)
-            c_b[0:percentage] = bytearray([color.b] * percentage)
-        except IndexError:
-            c_r = bytearray([0] * NUM_PIXELS)
-            c_g = bytearray([0] * NUM_PIXELS)
-            c_b = bytearray([0] * NUM_PIXELS)
-        return c_r,c_g,c_b
+# #         cur_time = time.time()
+#         t = pygame.time.get_ticks()/1000
+# #         self._time = cur_time
+#         try:
+#             amp = abs(self._time_series[int((pygame.time.get_ticks()/1000)*self._sample_rate)])
+# #         print(amp)
+#             percentage = int((amp/self._max_amp)*NUM_PIXELS)
+# #             print(percentage)
+#             c_r[0:percentage] = bytearray([color.r] * percentage)
+#             c_g[0:percentage] = bytearray([color.g] * percentage)
+#             c_b[0:percentage] = bytearray([color.b] * percentage)
+#         except IndexError:
+#             c_r = bytearray([0] * NUM_PIXELS)
+#             c_g = bytearray([0] * NUM_PIXELS)
+#             c_b = bytearray([0] * NUM_PIXELS)
+#         return c_r,c_g,c_b
+    
+    def exit(self):
+        pass
 
 class BasicMode(Mode):
     def __init__(self):
@@ -117,6 +131,9 @@ class BasicMode(Mode):
         self._get_pattern()
 
         return self._pattern.render()
+
+    def exit(self):
+        pass
 
     def _get_pattern(self):
         new_pattern_id = locked_data.shadow_state["pattern"]
@@ -139,6 +156,36 @@ class BasicMode(Mode):
                 self._pattern = NullPattern()
 
             self._pattern_id = new_pattern_id
+
+class LightsaberMode(Mode):
+    def __init__(self):
+        self._thread = None
+        self.v = Value("I", 0)
+
+    def run(self):
+        if ser != None:
+            value = ser.read_until().strip()
+            self.v.value = int(value) if value else 0
+
+        if self._thread == None:
+            print("Starting publish thread...")
+            self._thread = threading.Thread(target=publish_sensors_data, args=(self.v,))
+            self._thread.start()
+
+        weight = round(self.v.value / 1023 * 255)
+
+        c_r = c_g = c_b = bytearray([weight] * NUM_PIXELS)
+
+        return c_r, c_g, c_b
+    
+    def exit(self):
+        if self._thread != None:
+            print("Stopping publish thread...")
+
+            self._thread.is_run = False
+            self._thread.join()
+
+            self._thread = None
 
 class Pattern(ABC):
     @abstractmethod
@@ -320,6 +367,9 @@ def exit(msg_or_exception):
         print("Exiting:", msg_or_exception)
 
     print("Disconnecting...")
+    if mode != None:
+        mode.exit()
+
     future = mqtt_connection.disconnect()
     future.add_done_callback(on_disconnected)
 
@@ -339,18 +389,22 @@ def on_get_shadow_accepted(response):
             print("  Shadow reported state: ", end="")
             print(json.dumps(response.state.reported))
 
-            with locked_data.lock:
-                locked_data.shadow_state = response.state.reported
+            change_local_state(response.state.reported)
         else:
             is_update = True
 
         if response.state.delta:
+            delta = response.state.delta
             print("  Shadow delta: ", end="")
-            print(json.dumps(response.state.delta))
+            print(json.dumps(delta))
 
-            with locked_data.lock:
-                for p in response.state.delta:
-                    locked_data.shadow_state[p] = response.state.delta[p]
+            change_local_state(delta)
+
+            if ("upload_image" in delta):
+                start_download_thread("image")
+
+            if ("upload_audio" in delta):
+                start_download_thread("audio")
 
             is_update = True
 
@@ -379,9 +433,13 @@ def on_shadow_delta_updated(delta):
             print("  Delta reports desired values are: ", end="")
             print(json.dumps(delta.state))
 
-            with locked_data.lock:
-                for p in delta.state:
-                    locked_data.shadow_state[p] = delta.state[p]
+            change_local_state(delta.state)
+
+            if ("upload_image" in delta.state):
+                start_download_thread("image")
+
+            if ("upload_audio" in delta.state):
+                start_download_thread("audio")
 
             change_shadow_state()
         else:
@@ -412,6 +470,44 @@ def on_update_shadow_rejected(error):
     exit("Update request was rejected. code:{} message:'{}'".format(
         error.code, error.message))
 
+def download_file(file_type):
+    key = THING_NAME + "/" + file_type
+
+    print("Downloading %s..." % file_type)
+    s3.download_file(S3_BUCKET, key, file_type)
+    print("Finished downloading %s." % file_type)
+
+def start_download_thread(file_type):
+    thread = threading.Thread(target=download_file, args=(file_type,))
+    thread.start()
+
+def publish_sensors_data(v):
+    print("Started publish thread.")
+
+    t = threading.currentThread()
+    while getattr(t, "is_run", True):
+        topic = "lightstick/" + THING_NAME + "/data"
+        payload = {
+            "x": v.value,
+            "y": 1 / v.value if v.value > 0 else 1
+        }
+
+        print(topic, payload)
+
+        mqtt_connection.publish(
+            topic=topic,
+            payload=json.dumps(payload),
+            qos=mqtt.QoS.AT_LEAST_ONCE)
+
+        time.sleep(5)
+
+    print("Stopped publish thread.")
+
+def change_local_state(new_state):
+    with locked_data.lock:
+        for p in new_state:
+            locked_data.shadow_state[p] = new_state[p]
+
 def change_shadow_state():
     print("Updating reported shadow value.")
     reported = {}
@@ -435,10 +531,15 @@ def loop():
 
     # If mode has actually changed
     if new_mode_id != mode_id:
+        if mode != None:
+            mode.exit()
+
         if new_mode_id == 1:
             mode = BasicMode()
         elif new_mode_id == 3:
             mode = MusicMode()
+        elif new_mode_id == 5:
+            mode = LightsaberMode()
         else:
             mode = NullMode()
 
@@ -447,6 +548,10 @@ def loop():
     c_r, c_g, c_b = mode.run()
 
     if ser != None:
+        # Clear buffers for clean input and output
+        ser.reset_input_buffer()
+        ser.reset_output_buffer()
+
         ser.write(c_r)
         ser.write(c_g)
         ser.write(c_b)
@@ -457,8 +562,9 @@ def loop():
 
 
 if __name__ == "__main__":
-    # ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
+    ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
     lightstick = VirtualLightstick(NUM_PIXELS)
+    s3 = boto3.client("s3")
 
     # Short delay to let serial setup properly
     time.sleep(1)

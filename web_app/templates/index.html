@@ -17,7 +17,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
   </head>
 
-  <body>		
+  <body>
+    {% if lightsticks|length > 0 %}
     <div class="d-flex justify-content-around">
       <!--Sidebar-->
 			<div id="sidebar" class="d-flex flex-column bg-dark">
@@ -32,15 +33,10 @@
       </div>
       <div id="content" class="content p-4">
         <header>
-          {% set first = lightsticks[0] %}
-          <div class="row">
-            <div class="col-sm-auto">
-              <button id="toggle-sb" class="btn rounded text-end p-0">
-                <i class="bi bi-list icons"></i>
-              </button>
-            </div>
-            <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2">{{ first.name[10:] }}</span></h1>
-            <div class="col-6">
+          <div class="row justify-content-end gy-2">
+            <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2"></span></h1>
+            <div class="col-12 col-md-6">
+
               <div class="row">
                 <div class="col d-flex justify-content-end align-items-center">
                   <span id="switch-label-off" class="fs-7 me-2 switch-label">off</span>
@@ -82,7 +78,7 @@
             <div class="my-4">
               <h6 class="m-0">color</h6>
               <p>
-              set the color(s) displayed in the pattern
+                set the color(s) displayed in the pattern
               </p>
 
               <div id="colors" class="d-flex">
@@ -95,12 +91,32 @@
             <h2 id="main-header mb-4">image</h2>
             <div class="my-4">
               <h6 class="m-0">upload</h6>
-              <input type="file" class="form-control-file">
+              <p>
+                choose an image to be displayed on the lightstick
+              </p>
+
+              <div class="text-center">
+                <input id="file-image" accept="image/jpeg, image/png" type="file" class="form-control-file">
+                <br>
+                <button id="btn-upload-image" class="btn btn-primary mt-3">upload</button>
+              </div>
             </div>
           </div>
 
           <div id="panel-audio">
             <h2 id="main-header mb-4">audio</h2>
+            <div class="my-4">
+              <h6 class="m-0">upload</h6>
+              <p>
+                choose an audio file to be visualized on the lightstick
+              </p>
+
+              <div class="text-center">
+                <input id="file-audio" accept="audio/mpeg, audio/wav" type="file" class="form-control-file">
+                <br>
+                <button id="btn-upload-audio" class="btn btn-primary mt-3">upload</button>
+              </div>
+            </div>
           </div>
 
           <div id="panel-microphone">
@@ -109,6 +125,22 @@
 
           <div id="panel-lightsaber">
             <h2 id="main-header mb-4">lightsaber</h2>
+
+            <div class="my-4">
+              <h6 class="m-0">sensors</h6>
+              <p>
+                graphical visualisation of sensors data
+              </p>
+
+              <div class="row row-cols-1 row-cols-md-2 gx-5 gy-5">
+                <div>
+                  <canvas id="chart-x"></canvas>
+                </div>
+                <div>
+                  <canvas id="chart-y"></canvas>
+                </div>
+              </div>
+            </div>
           </div>
         </main>
 
@@ -118,46 +150,151 @@
     </div>
 
     <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.2.0/chart.min.js" integrity="sha512-VMsZqo0ar06BMtg0tPsdgRADvl0kDHpTbugCBBrL55KmucH6hP9zWdLIWY//OTfMnzz6xWQRxQqsUFefwHuHyg==" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@next/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js" integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
     <script>
       $(document).ready(function() {
         const DURATION = 200;
+        const FILE_SIZE_LIMIT = 1000000 // File size limit of 1MB
+        const MIME_TYPES = {
+          image: ["image/jpeg", "image/png"],
+          audio: ["audio/mpeg", "audio/wav"]
+        }
 
-        let current = 0;
         let lightsticks = {{ lightsticks|tojson }};
         let modes = {{ modes|tojson }};
         let patterns = {{ patterns|tojson }};
 
-        function updateLightstick(field, value) {
-          // Get lightstick ID
-          lightsticks[current][field] = value;
+        let currentIndex = 0;
+        let current = lightsticks[currentIndex];
 
-          console.log("UPDATE:", lightsticks[current]);
+        let intervalId = null;
+
+        function stopInterval(id) {
+          if (id != null) {
+            clearInterval(id);
+          }
+
+          return null;
+        }
+
+        function getSensorsData() {
+          $.ajax({
+            url: "/lightstick/" + current["name"] + "/data",
+            method: "GET",
+            success: function (res) {
+              console.log(res);
+              chartX.data.datasets[0].data = res["x"];
+              chartX.update();
+
+              chartY.data.datasets[0].data = res["y"];
+              chartY.update();
+            },
+            error: function (err) {
+              console.log(err);
+              alert("Something went wrong on the server...");
+            }
+          });
+        }
+
+        function updateLightstick(field, value) {
+          current[field] = value;
+
+          console.log("UPDATE:", current);
 
           // Send AJAX update request
           $.ajax({
-            url: "/lightstick/" + lightsticks[current]["name"],
+            url: "/lightstick/" + current["name"],
             method: "POST",
             data: { field, value },
             success: function (res) {
               console.log(res);
             },
+            error: function (err) {
+              console.log(err);
+              alert("Something went wrong on the server...");
+            }
+          });
+        }
+
+        function uploadFile(file) {
+          let fd = new FormData();
+          fd.append("file", file);
+          console.log(file);
+
+          $.ajax({
+            url: `lightstick/${current["name"]}/upload`,
+            method: "POST",
+            data: fd,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+              console.log(res);
+            },
+            error: function (err) {
+              console.log(err);
+              alert("Something went wrong on the server...");
+            }
+          });
+        }
+
+        function generateChart(ctx, label, data) {
+          return new Chart(ctx, {
+            type: "line",
+            data: {
+              datasets: [{
+                data: data,
+                label,
+                backgroundColor: "rgba(67, 255, 175, 0.5)",
+                borderColor: "rgb(67, 255, 175)",
+                tension: 0.3
+              }]
+            },
+            options: {
+              plugins: {
+                legend: {
+                  display: false,
+                },
+              },
+              parsing: {
+                xAxisKey: "timestamp",
+                yAxisKey: "value"
+              },
+              responsive: true,
+              <!--maintainAspectRatio: false,-->
+              scales: {
+                x: {
+                  type: "time",
+                }
+              }
+            }
           });
         }
 
         function onModeSwitch() {
-          let modeId = $(this).data("value");
+          let id = $(this).data("value");
 
-          changeActiveMode(modeId);
-          updateLightstick("mode", modeId);
+          if (!(id in modes)) {
+            alert("Invalid mode.")
+            return;
+          }
+
+          changeActiveMode(id);
+          updateLightstick("mode", id);
         }
 
         function onPatternSwitch() {
-          let patternId = $(this).data("value");
+          let id = $(this).data("value");
 
-          changeActivePattern(patternId)
-          updateLightstick("pattern", patternId);
+          if (!(id in patterns)) {
+            alert("Invalid pattern.")
+            return;
+          }
+
+          changeActivePattern(id)
+          updateLightstick("pattern", id);
         }
 
         function onColorSubmit() {
@@ -179,25 +316,45 @@
         }
 
         function onChangeLightstick() {
-          //~ current = (current < lightsticks.length - 1) ? current + 1 : 0;
-          //~ let lightstick = lightsticks[current];
-          
-          for (i=0; i<lightsticks.length; i++){
-            if (lightsticks[i].name == this.innerText){
-              lightstick = lightsticks[i];
-              current = i;
-            }
+          if (lightsticks.length > 1) {
+            currentIndex = (currentIndex < lightsticks.length - 1) ? currentIndex + 1 : 0;
+            current = lightsticks[currentIndex];
+
+            // Rerender site
+            $("#lightstick").text(current.name.substring(10));
+
+            intervalId = stopInterval(intervalId);
+
+            // Update site state
+            toggleBlind(current.is_on);
+            toggleSwitch(current.is_on);
+            setTimeout(function() { changeActiveMode(current.mode); }, DURATION);
+            setTimeout(function() { changeActivePattern(current.pattern); }, DURATION * 2);
+            toggleLightstick();
+          }
+        }
+
+        function onUploadFile(type) {
+          let inputFiles = $("#file-" + type).prop("files");
+
+          if (inputFiles.length <= 0) {
+            alert("No file selected.");
+            return;
           }
 
-          // Rerender site
-          $("#lightstick").text(lightstick.name.substring(10));
+          let file = inputFiles[0];
 
-          // Update site state
-          toggleBlind(lightsticks[current].is_on);
-          toggleSwitch(lightsticks[current].is_on);
-          setTimeout(function() { changeActiveMode(lightsticks[current].mode); }, DURATION);
-          setTimeout(function() { changeActivePattern(lightsticks[current].pattern); }, DURATION * 2);
-          toggleLightstick();
+          if (!MIME_TYPES[type].includes(file["type"])) {
+            alert("Invalid file type.");
+            return;
+          }
+
+          if (file["size"] > FILE_SIZE_LIMIT) {
+            alert(`File size is too large (greater than ${FILE_SIZE_LIMIT}).`)
+            return;
+          }
+
+          uploadFile(file);
         }
 
         function toggleBlind(isOn) {
@@ -222,7 +379,7 @@
         function toggleLightstick(){
           var sb_options = document.getElementsByClassName("lightstick-sb");
           for (i=0; i<sb_options.length; i++){
-            if(lightsticks[current].name == sb_options[i].innerText){
+            if(current["name"] == sb_options[i].innerText){
               sb_options[i].classList.add("active");
             }else{
               sb_options[i].classList.remove("active");
@@ -236,6 +393,13 @@
         }
 
         function changeActiveMode(id) {
+          if (id == 5) {
+            getSensorsData();
+            intervalId = setInterval(getSensorsData, 5000);
+          } else {
+            intervalId = stopInterval(intervalId)
+          }
+
           // Change "active" button
           $("#modes .btn").removeClass("active");
           $(`#modes .btn[data-value='${id}']`).addClass("active");
@@ -267,7 +431,7 @@
 
           $("#colors > *").fadeOut(DURATION, function() {
             // Update color inputs
-            let colors = lightsticks[current].colors;
+            let colors = current.colors;
 
             $("#colors").find("input[type='color']").remove();
 
@@ -285,23 +449,38 @@
           });
         }
 
+        // Generate charts
+        let chartX = generateChart($("#chart-x"), "x", []);
+        let chartY = generateChart($("#chart-y"), "y", []);
+
         // Attach click handlers
         $(document).on("click", "#modes .btn", onModeSwitch);
         $(document).on("click", "#patterns .btn", onPatternSwitch);
         $(document).on("click", "#btn-submit-color", onColorSubmit);
         $(document).on("click", "#switch-power", onPowerSwitch);
         $(document).on("click", "#lightstick", onChangeLightstick);
+        $(document).on("click", "#btn-upload-image", function() { onUploadFile("image"); });
+        $(document).on("click", "#btn-upload-audio", function() { onUploadFile("audio"); });
         $(document).on("click", ".lightstick-sb", onChangeLightstick);
         $(document).on("click", "#toggle-sb", onToggleSidebar);
-
+        
         // Set initial website state
-        toggleBlind(lightsticks[current].is_on);
-        toggleSwitch(lightsticks[current].is_on);
-        changeActiveMode(lightsticks[current].mode);
-        changeActivePattern(lightsticks[current].pattern);
+        $("#lightstick").text(current.name.substring(10));
+        toggleBlind(current.is_on);
+        toggleSwitch(current.is_on);
+        changeActiveMode(current.mode);
+        changeActivePattern(current.pattern);
         toggleLightstick();
-
       });
     </script>
+    {% else %}
+    <div class="d-flex justify-content-around align-items-center fill">
+      <p class="text-center m-5">
+        No lightsticks found.
+        <br>
+        Please register one in AWS IoT Core and then refresh this page.
+      </p>
+    </div>
+    {% endif %}
   </body>
 </html>

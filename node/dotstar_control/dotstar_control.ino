@@ -5,11 +5,14 @@
 #include <SPI.h>
 
 #define NUM_PIXELS 8
+#define POT_PIN A0
 
 Adafruit_DotStar strip(NUM_PIXELS, DOTSTAR_BGR);
 
 void setup() {
   Serial.begin(115200);
+  
+  pinMode(POT_PIN, INPUT);
   
   strip.begin();
   strip.clear();
@@ -26,7 +29,7 @@ void loop() {
     Serial.readBytes(r, NUM_PIXELS);
     Serial.readBytes(g, NUM_PIXELS);
     Serial.readBytes(b, NUM_PIXELS);
-    
+
     // Set RGB value for each DotStar pixel
     for (int i = 0; i < NUM_PIXELS; i++) {
       strip.setPixelColor(i, (uint8_t) r[i], (uint8_t) g[i], (uint8_t) b[i]);
@@ -34,5 +37,10 @@ void loop() {
     
     strip.show();
   }
+  
+  int value = analogRead(POT_PIN);
+  Serial.println(value);
+  
+  delay(1);
 }
 
