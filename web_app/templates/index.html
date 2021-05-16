@@ -23,7 +23,7 @@
     <div class="container-fluid">
     <div class="row flex-row flex-nowrap"  style="width:100%;">
       <!--Sidebar-->
-      <div id="sidebar" class="d-flex flex-column bg-dark col-auto p-0 d-none d-lg-block .animated .fadeInRight">
+      <div id="sidebar" class="d-flex flex-column bg-dark col-auto p-0">
           <h3 class="p-3 coloured"><b>Lighting Project</b></h3>
           <ul class="list-group d-flex">
             {% for lightstick in lightsticks %}
@@ -33,13 +33,13 @@
             {% endfor %}
           </ul>
       </div>
-      <div class="d-flex col-auto justify-content-around">
+      <div class="d-flex col justify-content-around">
         <div id="content" class="content p-4">
           <header>
             <div class="row">
             <div class="row justify-content-end gy-2">
               <!--Button-->
-              <div class="col-sm-auto d-none d-lg-block">
+              <div class="col-sm-auto">
                 <button id="toggle-sb" class="btn rounded text-end p-0">
                   <i class="bi bi-list icons"></i>
                 </button>
@@ -344,6 +344,25 @@
             toggleLightstick();
           }
         }
+        
+        function onSelectLightstick() {
+          for (i=0; i<lightsticks.length; i++){
+            if (lightsticks[i]["name"] == this.innerText){
+              current = lightsticks[i];
+            }
+          }
+          // Rerender site
+          $("#lightstick").text(current.name.substring(10));
+
+          intervalId = stopInterval(intervalId);
+
+          // Update site state
+          toggleBlind(current.is_on);
+          toggleSwitch(current.is_on);
+          setTimeout(function() { changeActiveMode(current.mode); }, DURATION);
+          setTimeout(function() { changeActivePattern(current.pattern); }, DURATION * 2);
+          toggleLightstick();
+        }
 
         function onUploadFile(type) {
           let inputFiles = $("#file-" + type).prop("files");
@@ -400,7 +419,7 @@
         
         function onToggleSidebar() {
           var sidebar = document.getElementById("sidebar");
-          sidebar.classList.toggle("d-lg-block");
+          sidebar.classList.toggle("d-none");
         }
 
         function changeActiveMode(id) {
@@ -472,7 +491,7 @@
         $(document).on("click", "#lightstick", onChangeLightstick);
         $(document).on("click", "#btn-upload-image", function() { onUploadFile("image"); });
         $(document).on("click", "#btn-upload-audio", function() { onUploadFile("audio"); });
-        $(document).on("click", ".lightstick-sb", onChangeLightstick);
+        $(document).on("click", ".lightstick-sb", onSelectLightstick);
         $(document).on("click", "#toggle-sb", onToggleSidebar);
         
         // Set initial website state
