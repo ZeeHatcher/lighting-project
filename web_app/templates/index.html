@@ -19,9 +19,9 @@
 
   <body>
     {% if lightsticks|length > 0 %}
-    <div class="d-flex justify-content-around">
+    <div class="row">
       <!--Sidebar-->
-			<div id="sidebar" class="d-flex flex-column bg-dark">
+      <div id="sidebar" class="d-flex flex-column bg-dark col-sm-auto p-0">
           <h3 class="p-3 coloured"><b>Lighting Project</b></h3>
           <ul class="list-group d-flex">
             {% for lightstick in lightsticks %}
@@ -31,127 +31,129 @@
             {% endfor %}
           </ul>
       </div>
-      <div id="content" class="content p-4">
-        <header>
-          <div class="row">
-          <div class="row justify-content-end gy-2">
-            <!--Button-->
-            <div class="col-sm-auto">
-              <button id="toggle-sb" class="btn rounded text-end p-0">
-                <i class="bi bi-list icons"></i>
-              </button>
-            </div>
-            <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2"></span></h1>
-            <div class="col-12 col-md-6">
+      <div class="d-flex justify-content-around col">
+        <div id="content" class="content p-4">
+          <header>
+            <div class="row">
+            <div class="row justify-content-end gy-2">
+              <!--Button-->
+              <div class="col-sm-auto">
+                <button id="toggle-sb" class="btn rounded text-end p-0">
+                  <i class="bi bi-list icons"></i>
+                </button>
+              </div>
+              <h1 class="col">lightstick<span id="lightstick" class="text-decoration-underline cursor-pointer px-2"></span></h1>
+              <div class="col-12 col-md-6">
 
-                <div class="col d-flex justify-content-end align-items-center">
-                  <span id="switch-label-off" class="fs-7 me-2 switch-label">off</span>
-                  <div class="form-switch">
-                    <input id="switch-power" class="form-check-input" type="checkbox">
+                  <div class="col d-flex justify-content-end align-items-center">
+                    <span id="switch-label-off" class="fs-7 me-2 switch-label">off</span>
+                    <div class="form-switch">
+                      <input id="switch-power" class="form-check-input" type="checkbox">
+                    </div>
+                    <span id="switch-label-on" class="fs-7 switch-label">on</span>
                   </div>
-                  <span id="switch-label-on" class="fs-7 switch-label">on</span>
+                </div>
+
+                <div class="row">
+                  <nav id="modes" class="col d-flex justify-content-end flex-wrap">
+                    {% for id, mode in modes.items() %}
+                    <div class="btn btn-text fs-7 ms-1" data-value={{ id }} style="display: none">{{ mode.name }}</div>
+                    {% endfor %}
+                  </nav>
                 </div>
               </div>
+            </div>
+          </header>
 
-              <div class="row">
-                <nav id="modes" class="col d-flex justify-content-end flex-wrap">
-                  {% for id, mode in modes.items() %}
-                  <div class="btn btn-text fs-7 ms-1" data-value={{ id }} style="display: none">{{ mode.name }}</div>
+          <main id="panels" class="my-5" style="display: none;">
+            <div id="panel-basic">
+              <h2 id="main-header mb-4">basic</h2>
+
+              <div class="my-4">
+                <h6 class="m-0">pattern</h6>
+                <p>
+                  choose a lighting pattern
+                </p>
+
+                <div id="patterns" class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 gx-2 gy-2 btn-grid">
+                  {% for id, pattern in patterns.items() %}
+                  <div class="col"><button class="btn btn-primary" data-value={{ id }}>{{ pattern.name }}</button></div>
                   {% endfor %}
-                </nav>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <main id="panels" class="my-5" style="display: none;">
-          <div id="panel-basic">
-            <h2 id="main-header mb-4">basic</h2>
-
-            <div class="my-4">
-              <h6 class="m-0">pattern</h6>
-              <p>
-                choose a lighting pattern
-              </p>
-
-              <div id="patterns" class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 gx-2 gy-2 btn-grid">
-                {% for id, pattern in patterns.items() %}
-                <div class="col"><button class="btn btn-primary" data-value={{ id }}>{{ pattern.name }}</button></div>
-                {% endfor %}
-              </div>
-            </div>
-
-            <div class="my-4">
-              <h6 class="m-0">color</h6>
-              <p>
-                set the color(s) displayed in the pattern
-              </p>
-
-              <div id="colors" class="d-flex">
-                <button id="btn-submit-color" class="btn btn-primary">submit</button>
-              </div>
-            </div>
-          </div>
-
-          <div id="panel-image">
-            <h2 id="main-header mb-4">image</h2>
-            <div class="my-4">
-              <h6 class="m-0">upload</h6>
-              <p>
-                choose an image to be displayed on the lightstick
-              </p>
-
-              <div class="text-center">
-                <input id="file-image" accept="image/jpeg, image/png" type="file" class="form-control-file">
-                <br>
-                <button id="btn-upload-image" class="btn btn-primary mt-3">upload</button>
-              </div>
-            </div>
-          </div>
-
-          <div id="panel-audio">
-            <h2 id="main-header mb-4">audio</h2>
-            <div class="my-4">
-              <h6 class="m-0">upload</h6>
-              <p>
-                choose an audio file to be visualized on the lightstick
-              </p>
-
-              <div class="text-center">
-                <input id="file-audio" accept="audio/mpeg, audio/wav" type="file" class="form-control-file">
-                <br>
-                <button id="btn-upload-audio" class="btn btn-primary mt-3">upload</button>
-              </div>
-            </div>
-          </div>
-
-          <div id="panel-microphone">
-            <h2 id="main-header mb-4">microphone</h2>
-          </div>
-
-          <div id="panel-lightsaber">
-            <h2 id="main-header mb-4">lightsaber</h2>
-
-            <div class="my-4">
-              <h6 class="m-0">sensors</h6>
-              <p>
-                graphical visualisation of sensors data
-              </p>
-
-              <div class="row row-cols-1 row-cols-md-2 gx-5 gy-5">
-                <div>
-                  <canvas id="chart-x"></canvas>
                 </div>
-                <div>
-                  <canvas id="chart-y"></canvas>
+              </div>
+
+              <div class="my-4">
+                <h6 class="m-0">color</h6>
+                <p>
+                  set the color(s) displayed in the pattern
+                </p>
+
+                <div id="colors" class="d-flex">
+                  <button id="btn-submit-color" class="btn btn-primary">submit</button>
                 </div>
               </div>
             </div>
-          </div>
-        </main>
 
-        <footer>
-        </footer>
+            <div id="panel-image">
+              <h2 id="main-header mb-4">image</h2>
+              <div class="my-4">
+                <h6 class="m-0">upload</h6>
+                <p>
+                  choose an image to be displayed on the lightstick
+                </p>
+
+                <div class="text-center">
+                  <input id="file-image" accept="image/jpeg, image/png" type="file" class="form-control-file">
+                  <br>
+                  <button id="btn-upload-image" class="btn btn-primary mt-3">upload</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="panel-audio">
+              <h2 id="main-header mb-4">audio</h2>
+              <div class="my-4">
+                <h6 class="m-0">upload</h6>
+                <p>
+                  choose an audio file to be visualized on the lightstick
+                </p>
+
+                <div class="text-center">
+                  <input id="file-audio" accept="audio/mpeg, audio/wav" type="file" class="form-control-file">
+                  <br>
+                  <button id="btn-upload-audio" class="btn btn-primary mt-3">upload</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="panel-microphone">
+              <h2 id="main-header mb-4">microphone</h2>
+            </div>
+
+            <div id="panel-lightsaber">
+              <h2 id="main-header mb-4">lightsaber</h2>
+
+              <div class="my-4">
+                <h6 class="m-0">sensors</h6>
+                <p>
+                  graphical visualisation of sensors data
+                </p>
+
+                <div class="row row-cols-1 row-cols-md-2 gx-5 gy-5">
+                  <div>
+                    <canvas id="chart-x"></canvas>
+                  </div>
+                  <div>
+                    <canvas id="chart-y"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+
+          <footer>
+          </footer>
+        </div>
       </div>
     </div>
 
