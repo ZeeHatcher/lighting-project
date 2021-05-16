@@ -78,7 +78,6 @@ h2, h3, h4, h5, h6 {
 .content {
   max-width: 1000px;
   min-height: 100vh;
-  width: 100%;
 }
 
 .cursor-pointer {
@@ -138,12 +137,12 @@ h2, h3, h4, h5, h6 {
 
 #sidebar{
   width:280px;
-  transition: margin.35s ease;
 }
 
-.toggled-sb{
-  margin-left:-335px;
-}
+/*.toggled-sb{
+  margin-left:-280px;
+  /*transform:translateX(-100%);
+}*/
 
 .icons{
   font-size:2em;
@@ -152,5 +151,10 @@ h2, h3, h4, h5, h6 {
 
 .icons:hover, .cur-ls{
   color: #43ffaf;
+}
+
+.flex-row {
+  display: flex;
+  flex-wrap: wrap;
 }
 
