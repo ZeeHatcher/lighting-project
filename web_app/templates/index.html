@@ -15,13 +15,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
     <!--Bootstrap icons-->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
 
   <body>
     {% if lightsticks|length > 0 %}
-    <div class="row">
+    <div class="container-fluid">
+    <div class="row flex-row flex-nowrap"  style="width:100%;">
       <!--Sidebar-->
-      <div id="sidebar" class="d-flex flex-column bg-dark col-sm-auto p-0">
+      <div id="sidebar" class="d-flex flex-column bg-dark col-auto p-0 d-none d-lg-block .animated .fadeInRight">
           <h3 class="p-3 coloured"><b>Lighting Project</b></h3>
           <ul class="list-group d-flex">
             {% for lightstick in lightsticks %}
@@ -31,13 +33,13 @@
             {% endfor %}
           </ul>
       </div>
-      <div class="d-flex justify-content-around col">
+      <div class="d-flex col-auto justify-content-around">
         <div id="content" class="content p-4">
           <header>
             <div class="row">
             <div class="row justify-content-end gy-2">
               <!--Button-->
-              <div class="col-sm-auto">
+              <div class="col-sm-auto d-none d-lg-block">
                 <button id="toggle-sb" class="btn rounded text-end p-0">
                   <i class="bi bi-list icons"></i>
                 </button>
@@ -155,6 +157,7 @@
           </footer>
         </div>
       </div>
+    </div>
     </div>
 
     <!-- Scripts -->
@@ -397,7 +400,7 @@
         
         function onToggleSidebar() {
           var sidebar = document.getElementById("sidebar");
-          sidebar.classList.toggle("toggled-sb");
+          sidebar.classList.toggle("d-lg-block");
         }
 
         function changeActiveMode(id) {
@@ -479,6 +482,15 @@
         changeActiveMode(current.mode);
         changeActivePattern(current.pattern);
         toggleLightstick();
+        
+        /*if($(window).width()<800){
+          document.getElementById("sidebar").classList.add("d-none");
+          /*document.getElementById("sidebar").style.display="none";
+          /*document.getElementById("toggle-sb").style.display="none";
+        }else{
+          document.getElementById("sidebar").classList.remove("d-none");
+          /*document.getElementById("toggle-sb").style.display="block";
+        }*/
       });
     </script>
     {% else %}
