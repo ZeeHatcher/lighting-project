@@ -536,8 +536,8 @@ def loop():
 
         if new_mode_id == 1:
             mode = BasicMode()
-        elif new_mode_id == 3:
-            mode = MusicMode()
+#         elif new_mode_id == 3:
+#             mode = MusicMode()
         elif new_mode_id == 5:
             mode = LightsaberMode()
         else:
@@ -562,7 +562,7 @@ def loop():
 
 
 if __name__ == "__main__":
-    ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
+#     ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
     lightstick = VirtualLightstick(NUM_PIXELS)
     s3 = boto3.client("s3")
 
