@@ -7,6 +7,7 @@ from concurrent.futures import Future
 from dotenv import load_dotenv
 import json
 from multiprocessing import Value
+from PIL import Image
 import os
 import random
 import serial
@@ -156,6 +157,23 @@ class BasicMode(Mode):
                 self._pattern = NullPattern()
 
             self._pattern_id = new_pattern_id
+
+class ImageMode(Mode):
+    def __init__(self):
+        # Load and resize image
+        im = Image.open("image")
+        ratio = im.height / im.width
+        im = im.resize((NUM_PIXELS, round(NUM_PIXELS * ratio)))
+
+        self._image = im
+
+    def run(self):
+        c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+
+        return c_r, c_g, c_b
+
+    def exit(self):
+        pass
 
 class LightsaberMode(Mode):
     def __init__(self):
@@ -536,6 +554,8 @@ def loop():
 
         if new_mode_id == 1:
             mode = BasicMode()
+        elif new_mode_id == 2:
+            mode = ImageMode()
 #         elif new_mode_id == 3:
 #             mode = MusicMode()
         elif new_mode_id == 5:
