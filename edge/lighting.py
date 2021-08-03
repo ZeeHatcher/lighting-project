@@ -166,14 +166,33 @@ class ImageMode(Mode):
         im = im.resize((NUM_PIXELS, round(NUM_PIXELS * ratio)))
 
         self._image = im
+        self._row = 0
 
     def run(self):
-        c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+        c_r = []
+        c_g = []
+        c_b = []
+
+        # Get RGB values for each row in image
+        for i in range(NUM_PIXELS):
+            r, g, b = self._image.getpixel((i, self._row))
+            c_r.append(r)
+            c_g.append(g)
+            c_b.append(b)
+
+        self._row += 1
+
+        if self._row >= self._image.height:
+            self._row = 0
+
+        c_r = bytearray(c_r)
+        c_g = bytearray(c_g)
+        c_b = bytearray(c_b)
 
         return c_r, c_g, c_b
 
     def exit(self):
-        pass
+        self._image.close()
 
 class LightsaberMode(Mode):
     def __init__(self):
