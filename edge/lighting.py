@@ -165,34 +165,40 @@ class ImageMode(Mode):
         ratio = im.height / im.width
         im = im.resize((NUM_PIXELS, round(NUM_PIXELS * ratio)))
 
-        self._image = im
+        rows = [] # 3D-Array: Rows -> Channels -> Color
+
+        for y in range(im.height):
+            rows.append([]) # Initialize row arrays
+
+            for c in range(3):
+                rows[y].append([]) # Initialize channel arrays
+
+            # Fill channel arrays with color data
+            for x in range(im.width):
+                colors = im.getpixel((x, y))
+
+                for c in range(3):
+                    rows[y][c].append(colors[c])
+
+        im.close()
+
+        self._rows = rows
         self._row = 0
 
     def run(self):
-        c_r = []
-        c_g = []
-        c_b = []
-
-        # Get RGB values for each row in image
-        for i in range(NUM_PIXELS):
-            r, g, b = self._image.getpixel((i, self._row))
-            c_r.append(r)
-            c_g.append(g)
-            c_b.append(b)
+        c_r = bytearray(self._rows[self._row][0])
+        c_g = bytearray(self._rows[self._row][1])
+        c_b = bytearray(self._rows[self._row][2])
 
         self._row += 1
 
-        if self._row >= self._image.height:
+        if self._row >= len(self._rows):
             self._row = 0
-
-        c_r = bytearray(c_r)
-        c_g = bytearray(c_g)
-        c_b = bytearray(c_b)
 
         return c_r, c_g, c_b
 
     def exit(self):
-        self._image.close()
+        pass
 
 class LightsaberMode(Mode):
     def __init__(self):
