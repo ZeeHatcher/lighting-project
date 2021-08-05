@@ -162,6 +162,11 @@ class ImageMode(Mode):
     def __init__(self):
         # Load and resize image
         im = Image.open("image")
+
+        if im.mode == "P":
+            im = im.convert("RGB")
+
+        # Resize image while keeping aspect ratio
         ratio = im.height / im.width
         im = im.resize((NUM_PIXELS, round(NUM_PIXELS * ratio)))
 
@@ -514,11 +519,17 @@ def on_update_shadow_rejected(error):
         error.code, error.message))
 
 def download_file(file_type):
+    global mode, mode_id
     key = THING_NAME + "/" + file_type
 
     print("Downloading %s..." % file_type)
     s3.download_file(S3_BUCKET, key, file_type)
     print("Finished downloading %s." % file_type)
+
+    # Reset mode to load in newly downloaded image
+    if mode_id == 2 and file_type == "image":
+        mode.exit()
+        mode = ImageMode()
 
 def start_download_thread(file_type):
     thread = threading.Thread(target=download_file, args=(file_type,))
@@ -607,7 +618,7 @@ def loop():
 
 
 if __name__ == "__main__":
-#     ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
+    # ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
     lightstick = VirtualLightstick(NUM_PIXELS)
     s3 = boto3.client("s3")
 
