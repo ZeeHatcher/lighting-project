@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8"/>
+    <meta name="author" content="Toh Kah Hie"/>
+    <title>Virtual LightStick</title>
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet">
+</head>
+
+<body>
+	<script>
+		var mySubString = "{{colors}}".replace("[&#39;","#");
+		mySubString = mySubString.replace("&#39;]","");
+		for(var i=0; i < 145; i++){
+		   var newDiv = document.createElement('div');
+		   newDiv.id = 'r'+i;
+		   newDiv.className = 'pixel';
+		   newDiv.style.backgroundColor = mySubString;
+		document.body.appendChild(newDiv);
+			
+		}
+	</script>
+
+</body>
+</html>

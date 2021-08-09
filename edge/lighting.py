@@ -18,8 +18,10 @@ from uuid import uuid4
 from virtual import VirtualLightstick
 from colorsys import hls_to_rgb
 import numpy as np
-#import librosa
+import librosa
 import pygame
+from audio_analyzer import *
+from pydub.utils import mediainfo
 
 load_dotenv()
 
@@ -87,14 +89,29 @@ class NullMode(Mode):
 
 class MusicMode(Mode):
     def __init__(self):
-        filename = r"/home/pi/Music/kiara.wav"
-#         self._time_series, self._sample_rate = librosa.load(filename)
-#         self._max_amp = np.amax(self._time_series)
-#         self._time = time.time()
-#         print (self._max_amp)
-#         pygame.init()
-#         pygame.mixer.music.load(filename)
-#         pygame.mixer.music.play(0)
+        #/home/pi/Music/ftc2.ogg
+        filename = r"audio"
+        
+        self._analyzer = AudioAnalyzer(NUM_PIXELS)
+        self._analyzer.load(filename)
+        
+        pygame.init()
+        t=pygame.time.get_ticks()
+        self._getTicksLastFrame = t
+        
+        self._timeCount = 0
+        
+#         file = wave.open(filename)
+#         freq = file.getframerate()
+        info = mediainfo(filename)
+        freq = int(info["sample_rate"])
+#         print(freq)
+        
+        #quit to reset the initial
+        pygame.mixer.quit()
+        pygame.mixer.init(frequency=freq)
+        pygame.mixer.music.load(filename)
+        pygame.mixer.music.play()
 
     def run(self):
         colors = locked_data.shadow_state["colors"]
@@ -102,22 +119,24 @@ class MusicMode(Mode):
         c_r = bytearray([0] * NUM_PIXELS)
         c_g = bytearray([0] * NUM_PIXELS)
         c_b = bytearray([0] * NUM_PIXELS)
-# #         cur_time = time.time()
-#         t = pygame.time.get_ticks()/1000
-# #         self._time = cur_time
-#         try:
-#             amp = abs(self._time_series[int((pygame.time.get_ticks()/1000)*self._sample_rate)])
-# #         print(amp)
-#             percentage = int((amp/self._max_amp)*NUM_PIXELS)
-# #             print(percentage)
-#             c_r[0:percentage] = bytearray([color.r] * percentage)
-#             c_g[0:percentage] = bytearray([color.g] * percentage)
-#             c_b[0:percentage] = bytearray([color.b] * percentage)
-#         except IndexError:
-#             c_r = bytearray([0] * NUM_PIXELS)
-#             c_g = bytearray([0] * NUM_PIXELS)
-#             c_b = bytearray([0] * NUM_PIXELS)
-#         return c_r,c_g,c_b
+
+        if(pygame.mixer.music.get_busy()):
+            try:
+#                 t = pygame.time.get_ticks()
+#                 deltaTime = (t - self._getTicksLastFrame)/1000.0
+#                 self._getTicksLastFrame = deltaTime
+#                 
+#                 self._timeCount += deltaTime
+                percentage = int(self._analyzer.update(pygame.mixer.music.get_pos()/1000.0))
+
+                c_r[0:percentage] = bytearray([color.r] * percentage)
+                c_g[0:percentage] = bytearray([color.g] * percentage)
+                c_b[0:percentage] = bytearray([color.b] * percentage)
+            except IndexError:
+                c_r = bytearray([0] * NUM_PIXELS)
+                c_g = bytearray([0] * NUM_PIXELS)
+                c_b = bytearray([0] * NUM_PIXELS)
+        return c_r,c_g,c_b
     
     def exit(self):
         pass
@@ -536,8 +555,8 @@ def loop():
 
         if new_mode_id == 1:
             mode = BasicMode()
-#         elif new_mode_id == 3:
-#             mode = MusicMode()
+        elif new_mode_id == 3:
+            mode = MusicMode()
         elif new_mode_id == 5:
             mode = LightsaberMode()
         else:
