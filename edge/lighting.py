@@ -36,8 +36,6 @@ import serial
 import socket
 from virtual import VirtualLightstick
 
-
-
 load_dotenv()
 
 NUM_PIXELS = int(os.environ.get("NUM_PIXELS"))
@@ -249,9 +247,10 @@ class LightsaberMode(Mode):
             self.v.value = int(value) if value else 0
 
         if self._thread == None:
-            print("Starting publish thread...")
+            print("Starting publish thread... ", end="")
             self._thread = threading.Thread(target=publish_sensors_data, args=(self.v,))
             self._thread.start()
+            print("Started.")
 
         weight = round(self.v.value / 1023 * 255)
 
@@ -261,12 +260,13 @@ class LightsaberMode(Mode):
     
     def exit(self):
         if self._thread != None:
-            print("Stopping publish thread...")
+            print("Stopping publish thread... ", end="")
 
             self._thread.is_run = False
             self._thread.join()
 
             self._thread = None
+            print("Stopped.")
 
 class Pattern(ABC):
     @abstractmethod
@@ -447,7 +447,7 @@ def exit(msg_or_exception):
     else:
         print("Exiting:", msg_or_exception)
 
-    print("Disconnecting...")
+    print("Disconnecting... ", end="")
     if mode != None:
         mode.exit()
 
@@ -555,9 +555,9 @@ def download_file(file_type):
     global mode, mode_id
     key = THING_NAME + "/" + file_type
 
-    print("Downloading %s..." % file_type)
+    print("Downloading %s... " % file_type, end="")
     s3.download_file(S3_BUCKET, key, file_type)
-    print("Finished downloading %s." % file_type)
+    print("Finished.")
 
     # Reset mode to load in newly downloaded image
     if mode_id == 2 and file_type == "image":
@@ -569,8 +569,6 @@ def start_download_thread(file_type):
     thread.start()
 
 def publish_sensors_data(v):
-    print("Started publish thread.")
-
     t = threading.currentThread()
     while getattr(t, "is_run", True):
         topic = "lightstick/" + THING_NAME + "/data"
@@ -596,7 +594,7 @@ def change_local_state(new_state):
             locked_data.shadow_state[p] = new_state[p]
 
 def change_shadow_state():
-    print("Updating reported shadow value.")
+    print("Updating reported shadow value...")
     reported = {}
     with locked_data.lock:
         reported = locked_data.shadow_state
@@ -651,6 +649,15 @@ def loop():
 
 
 if __name__ == "__main__":
+    # Create a TCP/IP socket
+    print("Intializing TCP server... ", end="")
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind(("", 12345))
+    server_socket.listen(1)
+    print("Initialized.")
+
+    sockets = [server_socket]
+
     # ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
     lightstick = VirtualLightstick(NUM_PIXELS)
     s3 = boto3.client("s3")
@@ -674,8 +681,8 @@ if __name__ == "__main__":
         clean_session=False,
         keep_alive_secs=6)
 
-    print("Connecting to {} with client ID '{}'...".format(
-        os.environ.get("THING_ENDPOINT"), CLIENT_ID))
+    print("Connecting to {} with client ID '{}'... ".format(
+        os.environ.get("THING_ENDPOINT"), CLIENT_ID), end="")
 
     connected_future = mqtt_connection.connect()
 
@@ -683,11 +690,11 @@ if __name__ == "__main__":
 
     # Wait for connection to be fully established.
     connected_future.result()
-    print("Connected!")
+    print("Connected.")
 
     try:
         # Subscribe to topics: delta, update_success, update_rejected, get_success, get_rejected
-        print("Subscribing to Delta events...")
+        print("Subscribing to Delta events... ", end="")
         delta_subscribed_future, _ = shadow_client.subscribe_to_shadow_delta_updated_events(
             request=iotshadow.ShadowDeltaUpdatedSubscriptionRequest(thing_name=THING_NAME),
             qos=mqtt.QoS.AT_LEAST_ONCE,
@@ -695,8 +702,9 @@ if __name__ == "__main__":
 
         # Wait for subscription to succeed
         delta_subscribed_future.result()
+        print("Subscribed.")
 
-        print("Subscribing to Update responses...")
+        print("Subscribing to Update responses... ", end="")
         update_accepted_subscribed_future, _ = shadow_client.subscribe_to_update_shadow_accepted(
             request=iotshadow.UpdateShadowSubscriptionRequest(thing_name=THING_NAME),
             qos=mqtt.QoS.AT_LEAST_ONCE,
@@ -710,8 +718,9 @@ if __name__ == "__main__":
         # Wait for subscriptions to succeed
         update_accepted_subscribed_future.result()
         update_rejected_subscribed_future.result()
+        print("Subscribed.")
 
-        print("Subscribing to Get responses...")
+        print("Subscribing to Get responses... ", end="")
         get_accepted_subscribed_future, _ = shadow_client.subscribe_to_get_shadow_accepted(
             request=iotshadow.GetShadowSubscriptionRequest(thing_name=THING_NAME),
             qos=mqtt.QoS.AT_LEAST_ONCE,
@@ -725,15 +734,17 @@ if __name__ == "__main__":
         # Wait for subscriptions to succeed
         get_accepted_subscribed_future.result()
         get_rejected_subscribed_future.result()
+        print("Subscribed.")
 
         # Issue request for shadow's current state.
-        print("Requesting current shadow state...")
+        print("Requesting current shadow state... ", end="")
         publish_get_future = shadow_client.publish_get_shadow(
             request=iotshadow.GetShadowRequest(thing_name=THING_NAME),
             qos=mqtt.QoS.AT_LEAST_ONCE)
 
         # Ensure that publish succeeds
         publish_get_future.result()
+        print("Received.")
 
         while (True):
             loop()
