@@ -451,6 +451,9 @@ def exit(msg_or_exception):
     if mode != None:
         mode.exit()
 
+    for s in sockets:
+        s.close()
+
     future = mqtt_connection.disconnect()
     future.add_done_callback(on_disconnected)
 
@@ -634,6 +637,49 @@ def loop():
 
     c_r, c_g, c_b = mode.run()
 
+    # Wireless output
+    readable, writable, exceptional = select.select(sockets, sockets, sockets)
+
+    for s in readable:
+        if s is server_socket: # New client is attempting connection to server
+            print("New client detected.")
+            client_socket, address = server_socket.accept()
+            sockets.append(client_socket)
+
+        else: # Client has sent data
+            data = s.recv(64)
+            
+            if data:
+                print(data)
+
+            else: # Received 0 bytes, connection to client is closed
+                print("Closing client... ", end="")
+                sockets.remove(s)
+                s.close()
+                print("Closed.")
+
+    for s in writable:
+        try:
+            s.sendall(c_r)
+            s.sendall(c_g)
+            s.sendall(c_b)
+        except socket.error: # Connection closed
+            print("Error occured while writing to client.")
+            print("Closing client... ", end="")
+            sockets.remove(s)
+            s.close()
+            print("Closed.")
+        else:
+            time.sleep(1)
+
+    for s in exceptional:
+        print("An exception occured.")
+        print("Closing client... ", end="")
+        sockets.remove(s)
+        s.close()
+        print("Closed.")
+
+    # Serial output
     if ser != None:
         # Clear buffers for clean input and output
         ser.reset_input_buffer()
@@ -643,15 +689,17 @@ def loop():
         ser.write(c_g)
         ser.write(c_b)
 
+    # Virtual output
     if lightstick != None:
         lightstick.update(c_r, c_g, c_b)
 
 
 
 if __name__ == "__main__":
-    # Create a TCP/IP socket
+    # Create TCP/IP socket
     print("Intializing TCP server... ", end="")
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind(("", 12345))
     server_socket.listen(1)
     print("Initialized.")
