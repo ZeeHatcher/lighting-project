@@ -1,28 +1,42 @@
 from abc import ABC, abstractmethod
+from dotenv import load_dotenv
+import json
+from multiprocessing import Value
+import os
+import random
+import sys
+import threading
+import time
+import traceback
+
+# Cloud connectivity
 from awscrt import auth, io, mqtt, http
 from awsiot import iotshadow
 from awsiot import mqtt_connection_builder
 import boto3
 from concurrent.futures import Future
-from dotenv import load_dotenv
-import json
-from multiprocessing import Value
-from PIL import Image
-import os
-import random
-import serial
-import sys
-import threading
-import time
-import traceback
 from uuid import uuid4
-from virtual import VirtualLightstick
+
+# Basic Mode
 from colorsys import hls_to_rgb
+
+# Image Mode
+from PIL import Image
+
+# Music Mode
+from audio_analyzer import *
 import numpy as np
 import librosa
-import pygame
-from audio_analyzer import *
 from pydub.utils import mediainfo
+import pygame
+
+# Serial/Wireless/Virtual output
+import select
+import serial
+import socket
+from virtual import VirtualLightstick
+
+
 
 load_dotenv()
 
