@@ -234,8 +234,32 @@
             }
           });
         }
+        
+        function uploadStatus(msg,msg_type,file_type){
+          var icon_type = "bi bi-check-circle-fill";
+          //var icon = "<i class='bi bi-check-circle-fill fs-5'></i>";
+          var status = "#upload-status-" + file_type;
+          $(status).css('color','#43ffaf');
+          
+          if(msg_type=="input_err"){
+            $(status).css('color','orange');
+            icon_type ="bi bi-exclamation-circle-fill";
+          }
+          
+          if (msg_type=="server_err"){
+            $(status).css('color','#ff5349');
+             icon_type ="bi bi-x-circle-fill";
+          }
+          
+          if (msg_type=="uploading"){
+            icon_type = "fa fa-circle-o-notch fa-spin";
+          }
+          
+          var icon = "<i class='" + icon_type + " fs-5'></i>";
+          $(status).html(icon + " " + msg);
+        }
 
-        function uploadFile(file) {
+        function uploadFile(file,type) {
           let fd = new FormData();
           fd.append("file", file);
           console.log(file);
@@ -251,6 +275,7 @@
             },
             error: function (err) {
               console.log(err);
+              uploadStatus("Server Error","server_err",type);
               alert("Something went wrong on the server...");
             }
           });
@@ -353,25 +378,37 @@
 
         function onUploadFile(type) {
           let inputFiles = $("#file-" + type).prop("files");
+          
+          var msg = "Uploading";
 
           if (inputFiles.length <= 0) {
+            msg = "Empty file";
             alert("No file selected.");
-            return;
+            //return;
           }
 
           let file = inputFiles[0];
 
           if (!MIME_TYPES[type].includes(file["type"])) {
+            msg="Incompatible";
             alert("Invalid file type.");
-            return;
+            //return;
           }
 
           if (file["size"] > FILE_SIZE_LIMIT) {
+            msg="File too large";
             alert(`File size is too large (greater than ${FILE_SIZE_LIMIT}).`)
+            //return;
+          }
+          
+          if(msg != "Uploading"){
+            uploadStatus(msg,"input_err",type);
             return;
+          }else{
+            uploadStatus(msg,"uploading",type);
           }
 
-          uploadFile(file);
+          uploadFile(file,type);
         }
 
         function toggleBlind(isOn) {
