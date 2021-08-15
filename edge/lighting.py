@@ -7,6 +7,7 @@ from concurrent.futures import Future
 from dotenv import load_dotenv
 import json
 from multiprocessing import Value
+from PIL import Image
 import os
 import random
 import serial
@@ -175,6 +176,53 @@ class BasicMode(Mode):
                 self._pattern = NullPattern()
 
             self._pattern_id = new_pattern_id
+
+class ImageMode(Mode):
+    def __init__(self):
+        # Load and resize image
+        im = Image.open("image")
+
+        if im.mode == "P":
+            im = im.convert("RGB")
+
+        # Resize image while keeping aspect ratio
+        ratio = im.height / im.width
+        im = im.resize((NUM_PIXELS, round(NUM_PIXELS * ratio)))
+
+        rows = [] # 3D-Array: Rows -> Channels -> Color
+
+        for y in range(im.height):
+            rows.append([]) # Initialize row arrays
+
+            for c in range(3):
+                rows[y].append([]) # Initialize channel arrays
+
+            # Fill channel arrays with color data
+            for x in range(im.width):
+                colors = im.getpixel((x, y))
+
+                for c in range(3):
+                    rows[y][c].append(colors[c])
+
+        im.close()
+
+        self._rows = rows
+        self._row = 0
+
+    def run(self):
+        c_r = bytearray(self._rows[self._row][0])
+        c_g = bytearray(self._rows[self._row][1])
+        c_b = bytearray(self._rows[self._row][2])
+
+        self._row += 1
+
+        if self._row >= len(self._rows):
+            self._row = 0
+
+        return c_r, c_g, c_b
+
+    def exit(self):
+        pass
 
 class LightsaberMode(Mode):
     def __init__(self):
@@ -490,11 +538,17 @@ def on_update_shadow_rejected(error):
         error.code, error.message))
 
 def download_file(file_type):
+    global mode, mode_id
     key = THING_NAME + "/" + file_type
 
     print("Downloading %s..." % file_type)
     s3.download_file(S3_BUCKET, key, file_type)
     print("Finished downloading %s." % file_type)
+
+    # Reset mode to load in newly downloaded image
+    if mode_id == 2 and file_type == "image":
+        mode.exit()
+        mode = ImageMode()
 
 def start_download_thread(file_type):
     thread = threading.Thread(target=download_file, args=(file_type,))
@@ -555,6 +609,8 @@ def loop():
 
         if new_mode_id == 1:
             mode = BasicMode()
+        elif new_mode_id == 2:
+            mode = ImageMode()
         elif new_mode_id == 3:
             mode = MusicMode()
         elif new_mode_id == 5:
@@ -581,7 +637,7 @@ def loop():
 
 
 if __name__ == "__main__":
-#     ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
+    # ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
     lightstick = VirtualLightstick(NUM_PIXELS)
     s3 = boto3.client("s3")
 
