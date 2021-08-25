@@ -226,33 +226,51 @@ class ImageMode(Mode):
 
 class LightsaberMode(Mode):
     def __init__(self):
-        self._thread = None
-        self.v = Value("I", 0)
+        self._values = None
+        # self._thread = None
+        # self.v = Value("I", 0)
 
     def run(self):
-        if ser != None:
-            value = ser.read_until().strip()
-            self.v.value = int(value) if value else 0
+        # if ser != None:
+            # value = ser.read_until().strip()
+            # self.v.value = int(value) if value else 0
 
-        if self._thread == None:
-            print("Starting publish thread...")
-            self._thread = threading.Thread(target=publish_sensors_data, args=(self.v,))
-            self._thread.start()
+        # if self._thread == None:
+            # print("Starting publish thread...")
+            # self._thread = threading.Thread(target=publish_sensors_data, args=(self.v,))
+            # self._thread.start()
 
-        weight = round(self.v.value / 1023 * 255)
+        # weight = round(self.v.value / 1023 * 255)
 
-        c_r = c_g = c_b = bytearray([weight] * NUM_PIXELS)
+        if self._values == None or len(self._values) < 3:
+            c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+        else:
+            c_r = bytearray([self._colorify(self._values[0])] * NUM_PIXELS)
+            c_g = bytearray([self._colorify(self._values[1])] * NUM_PIXELS)
+            c_b = bytearray([self._colorify(self._values[2])] * NUM_PIXELS)
 
         return c_r, c_g, c_b
     
     def exit(self):
-        if self._thread != None:
-            print("Stopping publish thread...")
+        pass
+        # if self._thread != None:
+            # print("Stopping publish thread...")
 
-            self._thread.is_run = False
-            self._thread.join()
+            # self._thread.is_run = False
+            # self._thread.join()
 
-            self._thread = None
+            # self._thread = None
+
+    def _colorify(self, x):
+        return round(min(abs(x) / 4, 1) * 255)
+
+    @property
+    def values(self):
+        return self._values
+
+    @values.setter
+    def values(self, values):
+        self._values = values
 
 class Pattern(ABC):
     @abstractmethod
@@ -596,8 +614,10 @@ def change_shadow_state():
     future = shadow_client.publish_update_shadow(request, mqtt.QoS.AT_LEAST_ONCE)
     future.add_done_callback(on_publish_update_shadow)
 
+first = True
 def loop():
     global mode_id, mode
+    global first
 
     is_on = locked_data.shadow_state["is_on"]
     new_mode_id = locked_data.shadow_state["mode"] if is_on else 0
@@ -623,13 +643,23 @@ def loop():
     c_r, c_g, c_b = mode.run()
 
     if ser != None:
+        if ser.in_waiting and mode_id == 5:
+            l = ser.readline().decode("utf-8").strip()
+            print(l)
+
+            if first == True:
+                print("Discard first")
+                first = False
+            else:
+                mode.values = tuple(map(lambda v: float(v), l.split(",")))
+
         # Clear buffers for clean input and output
         ser.reset_input_buffer()
         ser.reset_output_buffer()
 
-        ser.write(c_r)
-        ser.write(c_g)
-        ser.write(c_b)
+        # ser.write(c_r)
+        # ser.write(c_g)
+        # ser.write(c_b)
 
     if lightstick != None:
         lightstick.update(c_r, c_g, c_b)
@@ -637,7 +667,7 @@ def loop():
 
 
 if __name__ == "__main__":
-    # ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
+    ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
     lightstick = VirtualLightstick(NUM_PIXELS)
     s3 = boto3.client("s3")
 
