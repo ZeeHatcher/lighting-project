@@ -647,16 +647,30 @@ def loop():
             sockets.append(client_socket)
 
         else: # Client has sent data
-            data = s.recv(64)
-            
-            if data:
-                print(data)
+            try:
+                data = s.recv(64)
 
-            else: # Received 0 bytes, connection to client is closed
-                print("Closing client... ", end="")
-                sockets.remove(s)
-                s.close()
-                print("Closed.")
+            except ConnectionResetError:
+                print("Connection reset by peer.")
+
+                if s in sockets:
+                    print("Closing client... ", end="")
+                    s.close()
+                    sockets.remove(s)
+                    print("Closed.")
+
+            else:
+                if data:
+                    print(data)
+
+                else:
+                    print("Received 0 bytes. Connection to client is closed.")
+
+                    if s in sockets:
+                        print("Closing client... ", end="")
+                        s.close()
+                        sockets.remove(s)
+                        print("Closed.")
 
     for s in writable:
         try:
@@ -666,17 +680,21 @@ def loop():
 
         except socket.error: # Connection closed
             print("Error occured while writing to client.")
+
+            if s in sockets:
+                print("Closing client... ", end="")
+                sockets.remove(s)
+                s.close()
+                print("Closed.")
+
+    for s in exceptional:
+        print("An exception occured.")
+
+        if s in sockets:
             print("Closing client... ", end="")
             sockets.remove(s)
             s.close()
             print("Closed.")
-
-    for s in exceptional:
-        print("An exception occured.")
-        print("Closing client... ", end="")
-        sockets.remove(s)
-        s.close()
-        print("Closed.")
 
     # Serial output
     if ser != None:
