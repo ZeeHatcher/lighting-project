@@ -13,7 +13,7 @@
 IPAddress server(address[0], address[1], address[2], address[3]);
 WiFiClient client;
 
-Adafruit_DotStar strip(NUM_PIXELS, DOTSTAR_BGR);
+Adafruit_DotStar strip(NUM_PIXELS, 23, 18, DOTSTAR_BGR);
 
 void connectToWiFi() {
   Serial.print("Connecting to WiFi");
@@ -44,9 +44,10 @@ void connectToServer() {
 
 void setup() {
   Serial.begin(9600);
-//  strip.begin();
-//  strip.clear();
-//  strip.show();
+  
+  strip.begin();
+  strip.clear();
+  strip.show();
 }
 
 void loop() {
@@ -61,44 +62,16 @@ void loop() {
       client.read(g, NUM_PIXELS);
       client.read(b, NUM_PIXELS);
 
-      // Flush buffer in case of desync
-//      client.flush();
-
-      Serial.println("===");
-      Serial.print("R: ");
-      for (int i = 0; i < sizeof(r); i++) {
-        Serial.print(r[i]);
-        Serial.print(",");
-      }
-      Serial.println("");
-      
-      Serial.print("G: ");
-      for (int i = 0; i < sizeof(g); i++) {
-        Serial.print(g[i]);
-        Serial.print(",");
-      }
-      Serial.println("");
-      
-      Serial.print("B: ");
-      for (int i = 0; i < sizeof(b); i++) {
-        Serial.print(b[i]);
-        Serial.print(",");
-      }
-      Serial.println("");
-
       // Set RGB value for each DotStar pixel
-//      for (int i = 0; i < NUM_PIXELS; i++) {
-//        strip.setPixelColor(i, (uint8_t) r[i], (uint8_t) g[i], (uint8_t) b[i]);
-//      }
-//      
-//      strip.show();
+      for (int i = 0; i < NUM_PIXELS; i++) {
+        strip.setPixelColor(i, (uint8_t) r[i], (uint8_t) g[i], (uint8_t) b[i]);
+      }
+      
+      strip.show();
     }
 
-//    if (millis() - prevSend > 5000) {
-//      client.flush();
-//    }
-
-    delay(1);
+    // Limit loop rate to 30 frames per second
+    delay(34);
   } else if (WiFi.status() != WL_CONNECTED) {
     // (Re)Connect to WiFi network
     connectToWiFi();

@@ -663,14 +663,13 @@ def loop():
             s.sendall(c_r)
             s.sendall(c_g)
             s.sendall(c_b)
+
         except socket.error: # Connection closed
             print("Error occured while writing to client.")
             print("Closing client... ", end="")
             sockets.remove(s)
             s.close()
             print("Closed.")
-        else:
-            time.sleep(1)
 
     for s in exceptional:
         print("An exception occured.")
@@ -692,6 +691,9 @@ def loop():
     # Virtual output
     if lightstick != None:
         lightstick.update(c_r, c_g, c_b)
+
+    # Limit to 30 frames per second
+    time.sleep(0.034)
 
 
 
