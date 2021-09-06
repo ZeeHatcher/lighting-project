@@ -5,3 +5,4 @@
 *.certs
 *image
 *audio
+LightingConfig.h

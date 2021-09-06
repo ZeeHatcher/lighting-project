@@ -1,23 +1,30 @@
 from abc import ABC, abstractmethod
+from dotenv import load_dotenv
+import json
+from multiprocessing import Value
+import os
+import random
+import sys
+import threading
+import time
+import traceback
+
+# Cloud connectivity
 from awscrt import auth, io, mqtt, http
 from awsiot import iotshadow
 from awsiot import mqtt_connection_builder
 import boto3
 from concurrent.futures import Future
-from dotenv import load_dotenv
-import json
-from multiprocessing import Value
-from PIL import Image
-import os
-import random
-import serial
-import sys
-import threading
-import time
-import traceback
 from uuid import uuid4
-from virtual import VirtualLightstick
+
+# Basic Mode
 from colorsys import hls_to_rgb
+
+# Image Mode
+from PIL import Image
+
+# Music Mode
+from audio_analyzer import *
 import numpy as np
 import librosa
 import pygame
@@ -28,6 +35,11 @@ import audioop
 import wave
 from gradient_generator import *
 
+# Serial/Wireless/Virtual output
+import select
+import serial
+import socket
+from virtual import VirtualLightstick
 
 load_dotenv()
 
@@ -345,66 +357,31 @@ class LightsaberMode(Mode):
 #         locked_data.shadow_state["pattern"]
 
     def run(self):
-#         if ser != None:
-#             value = ser.read_until().strip()
-#             self.v.value = int(value) if value else 0
-# 
-#         if self._thread == None:
-#             print("Starting publish thread...")
-#             self._thread = threading.Thread(target=publish_sensors_data, args=(self.v,))
-#             self._thread.start()
-# 
-#         weight = round(self.v.value / 1023 * 255)
-        direct = "/home/pi/Documents/lighting-project/edge/saber-sounds/"
-        c_r = bytearray([0] * NUM_PIXELS)
-        c_g = bytearray([0] * NUM_PIXELS)
-        c_b = bytearray([0] * NUM_PIXELS)
-        
-        if(self._phase == 2):
-#             print("Powered Up")
-            #do smth
-#             c_r = c_g = c_b = bytearray(NUM_PIXELS)
-#         else:
-            if pygame.mixer.music.get_busy():
-                print("Idling")
-            else:
-                pygame.mixer.music.load(direct+ "saber-idle2.wav")
-                pygame.mixer.music.play(loops=-1)
-                
-        if(self._phase == 1):
-            if pygame.mixer.music.get_busy():
-                print("Powering Up")
-            else:
-                pygame.mixer.music.load(direct+ self._type + "-saber-on.wav")
-                pygame.mixer.music.play()
-                
-            if(self._pixels < NUM_PIXELS):
-               self._pixels += 1
-               print(self._pixels)
-            else:
-                self._phase = 2
-#                 c_r = c_g = c_b = bytearray(self._pixels * )
-#             colors = self._get_colors()
-#             color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
-#             c_r = bytearray([color.r] * self._pixels)
-#             c_g = bytearray([color.g] * self._pixels)
-#             c_b = bytearray([color.b] * self._pixels)
-            
-        colors = locked_data.shadow_state["colors"]
-        color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
-        c_r[0:self._pixels] = bytearray([color.r] * self._pixels)
-        c_g[0:self._pixels] = bytearray([color.g] * self._pixels)
-        c_b[0:self._pixels] = bytearray([color.b] * self._pixels)
+        if ser != None:
+            value = ser.read_until().strip()
+            self.v.value = int(value) if value else 0
+
+        if self._thread == None:
+            print("Starting publish thread... ", end="")
+            self._thread = threading.Thread(target=publish_sensors_data, args=(self.v,))
+            self._thread.start()
+            print("Started.")
+
+        weight = round(self.v.value / 1023 * 255)
+
+        c_r = c_g = c_b = bytearray([weight] * NUM_PIXELS)
+
         return c_r, c_g, c_b
     
     def exit(self):
         if self._thread != None:
-            print("Stopping publish thread...")
+            print("Stopping publish thread... ", end="")
 
             self._thread.is_run = False
             self._thread.join()
 
             self._thread = None
+            print("Stopped.")
 
 class Pattern(ABC):
     @abstractmethod
@@ -585,9 +562,12 @@ def exit(msg_or_exception):
     else:
         print("Exiting:", msg_or_exception)
 
-    print("Disconnecting...")
+    print("Disconnecting... ", end="")
     if mode != None:
         mode.exit()
+
+    for s in sockets:
+        s.close()
 
     future = mqtt_connection.disconnect()
     future.add_done_callback(on_disconnected)
@@ -693,9 +673,9 @@ def download_file(file_type):
     global mode, mode_id
     key = THING_NAME + "/" + file_type
 
-    print("Downloading %s..." % file_type)
+    print("Downloading %s... " % file_type, end="")
     s3.download_file(S3_BUCKET, key, file_type)
-    print("Finished downloading %s." % file_type)
+    print("Finished.")
 
     # Reset mode to load in newly downloaded image
     if mode_id == 2 and file_type == "image":
@@ -707,8 +687,6 @@ def start_download_thread(file_type):
     thread.start()
 
 def publish_sensors_data(v):
-    print("Started publish thread.")
-
     t = threading.currentThread()
     while getattr(t, "is_run", True):
         topic = "lightstick/" + THING_NAME + "/data"
@@ -734,7 +712,7 @@ def change_local_state(new_state):
             locked_data.shadow_state[p] = new_state[p]
 
 def change_shadow_state():
-    print("Updating reported shadow value.")
+    print("Updating reported shadow value...")
     reported = {}
     with locked_data.lock:
         reported = locked_data.shadow_state
@@ -776,6 +754,66 @@ def loop():
 
     c_r, c_g, c_b = mode.run()
 
+    # Wireless output
+    readable, writable, exceptional = select.select(sockets, sockets, sockets)
+
+    for s in readable:
+        if s is server_socket: # New client is attempting connection to server
+            print("New client detected.")
+            client_socket, address = server_socket.accept()
+            sockets.append(client_socket)
+
+        else: # Client has sent data
+            try:
+                data = s.recv(64)
+
+            except ConnectionResetError:
+                print("Connection reset by peer.")
+
+                if s in sockets:
+                    print("Closing client... ", end="")
+                    s.close()
+                    sockets.remove(s)
+                    print("Closed.")
+
+            else:
+                if data:
+                    print(data)
+
+                else:
+                    print("Received 0 bytes. Connection to client is closed.")
+
+                    if s in sockets:
+                        print("Closing client... ", end="")
+                        s.close()
+                        sockets.remove(s)
+                        print("Closed.")
+
+    for s in writable:
+        try:
+            s.sendall(c_r)
+            s.sendall(c_g)
+            s.sendall(c_b)
+
+        except socket.error: # Connection closed
+            print("Error occured while writing to client.")
+
+            if s in sockets:
+                print("Closing client... ", end="")
+                sockets.remove(s)
+                s.close()
+                print("Closed.")
+
+    for s in exceptional:
+        print("An exception occured.")
+
+        if s in sockets:
+            print("Closing client... ", end="")
+            sockets.remove(s)
+            s.close()
+            print("Closed.")
+
+    # Serial output
     if ser != None:
         # Clear buffers for clean input and output
         ser.reset_input_buffer()
@@ -785,12 +823,26 @@ def loop():
         ser.write(c_g)
         ser.write(c_b)
 
+    # Virtual output
     if lightstick != None:
         lightstick.update(c_r, c_g, c_b)
+
+    # Limit to 30 frames per second
+    time.sleep(0.034)
 
 
 
 if __name__ == "__main__":
+    # Create TCP/IP socket
+    print("Intializing TCP server... ", end="")
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket.bind(("", 12345))
+    server_socket.listen(1)
+    print("Initialized.")
+
+    sockets = [server_socket]
+
     # ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
     lightstick = VirtualLightstick(NUM_PIXELS)
     s3 = boto3.client("s3")
@@ -814,8 +866,8 @@ if __name__ == "__main__":
         clean_session=False,
         keep_alive_secs=6)
 
-    print("Connecting to {} with client ID '{}'...".format(
-        os.environ.get("THING_ENDPOINT"), CLIENT_ID))
+    print("Connecting to {} with client ID '{}'... ".format(
+        os.environ.get("THING_ENDPOINT"), CLIENT_ID), end="")
 
     connected_future = mqtt_connection.connect()
 
@@ -823,11 +875,11 @@ if __name__ == "__main__":
 
     # Wait for connection to be fully established.
     connected_future.result()
-    print("Connected!")
+    print("Connected.")
 
     try:
         # Subscribe to topics: delta, update_success, update_rejected, get_success, get_rejected
-        print("Subscribing to Delta events...")
+        print("Subscribing to Delta events... ", end="")
         delta_subscribed_future, _ = shadow_client.subscribe_to_shadow_delta_updated_events(
             request=iotshadow.ShadowDeltaUpdatedSubscriptionRequest(thing_name=THING_NAME),
             qos=mqtt.QoS.AT_LEAST_ONCE,
@@ -835,8 +887,9 @@ if __name__ == "__main__":
 
         # Wait for subscription to succeed
         delta_subscribed_future.result()
+        print("Subscribed.")
 
-        print("Subscribing to Update responses...")
+        print("Subscribing to Update responses... ", end="")
         update_accepted_subscribed_future, _ = shadow_client.subscribe_to_update_shadow_accepted(
             request=iotshadow.UpdateShadowSubscriptionRequest(thing_name=THING_NAME),
             qos=mqtt.QoS.AT_LEAST_ONCE,
@@ -850,8 +903,9 @@ if __name__ == "__main__":
         # Wait for subscriptions to succeed
         update_accepted_subscribed_future.result()
         update_rejected_subscribed_future.result()
+        print("Subscribed.")
 
-        print("Subscribing to Get responses...")
+        print("Subscribing to Get responses... ", end="")
         get_accepted_subscribed_future, _ = shadow_client.subscribe_to_get_shadow_accepted(
             request=iotshadow.GetShadowSubscriptionRequest(thing_name=THING_NAME),
             qos=mqtt.QoS.AT_LEAST_ONCE,
@@ -865,15 +919,17 @@ if __name__ == "__main__":
         # Wait for subscriptions to succeed
         get_accepted_subscribed_future.result()
         get_rejected_subscribed_future.result()
+        print("Subscribed.")
 
         # Issue request for shadow's current state.
-        print("Requesting current shadow state...")
+        print("Requesting current shadow state... ", end="")
         publish_get_future = shadow_client.publish_get_shadow(
             request=iotshadow.GetShadowRequest(thing_name=THING_NAME),
             qos=mqtt.QoS.AT_LEAST_ONCE)
 
         # Ensure that publish succeeds
         publish_get_future.result()
+        print("Received.")
 
         while (True):
             loop()
