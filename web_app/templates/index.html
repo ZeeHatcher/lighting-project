@@ -113,15 +113,26 @@
               <p>
                 choose an image to be displayed on the lightstick
               </p>
-
-              <div class="text-center">
-                <input id="file-image" accept="image/jpeg, image/png" type="file" class="form-control-file">
-                <br>
-              </div>
-              <div class="text-center mt-3">
-                <button id="btn-upload-image" class="btn btn-primary">upload</button>
-                <span id="upload-status-image" class="mx-1 align-middle fw-bolder"></span>
-              </div>
+              <!--<div class="row align-items-center justify-content-center mb-0">
+                <div class="col-auto">-->
+                <div class="text-center">
+                  <input id="file-image" accept="image/jpeg, image/png" type="file" class="form-control-file">
+                  <br>
+                </div>
+                <div class="col-auto text-center">
+                  <img id="preview-image" class="p-2">
+                </div>
+                <div class="text-center">  
+                  <button id="btn-upload-image" class="btn btn-primary">upload</button>
+                  <span id="upload-status-image" class="mx-1 align-middle fw-bolder"></span>
+                </div>
+                <!--</div>-->
+                
+                <!--<div class="col-auto text-center">
+                  <img id="preview-image" class="p-2">
+                </div>
+              </div>-->
+              
             </div>
           </div>
 
@@ -249,24 +260,29 @@
         }
         
         function updateStatus(type,msg,id){
-          var icon_type = "fa fa-circle-o-notch fa-spin";
-          var color = '#43ffaf';
-          
-          if(type == "success"){
-            icon_type = "bi bi-check-circle-fill";
-          }else if (type == "fail"){
-            icon_type = "bi bi-x-circle-fill";
-            color = '#ff5349';
-          }else if(type=="error"){
-            icon_type ="bi bi-exclamation-circle-fill";
-            color = 'orange';
+          if(type == "clear"){
+            $(id).html("");
           }else{
-            icon_type = "fa fa-circle-o-notch fa-spin";
+            var icon_type = "fa fa-circle-o-notch fa-spin";
+            var color = '#43ffaf';
+            
+            if(type == "success"){
+              icon_type = "bi bi-check-circle-fill";
+            }else if (type == "fail"){
+              icon_type = "bi bi-x-circle-fill";
+              color = '#ff5349';
+            }else if(type=="error"){
+              icon_type ="bi bi-exclamation-circle-fill";
+              color = 'orange';
+            }else{
+              icon_type = "fa fa-circle-o-notch fa-spin";
+            }
+            
+            var icon = "<i class='" + icon_type + " fs-5 me-2'></i>";
+            $(id).css('color',color);
+            $(id).html(icon + msg);
           }
           
-          var icon = "<i class='" + icon_type + " fs-5 me-2'></i>";
-          $(id).css('color',color);
-          $(id).html(icon + msg);
         }
 
         function uploadFile(file,type) {
@@ -372,6 +388,7 @@
           for (let lightstick of lightsticks) {
             if (lightstick["name"] == $(this).data("name")) {
               current = lightstick;
+              $("#preview-image").attr("src","data:image/png;base64," + current["image"]);
             }
           }
 
@@ -381,6 +398,7 @@
 
           // Update site state
           $("#lightstick-name").text(current["name"]);
+          $("#preview-image").attr("src","data:image/png;base64," + current["image"]);
           changeLightstick();
           toggleBlind(current.is_on);
           toggleSwitch(current.is_on);
@@ -388,7 +406,9 @@
           setTimeout(function() { changeActivePattern(current.pattern); }, DURATION * 2);
         }
 
-        function onUploadFile(type) {
+        function onUploadFile(type,submit) {
+          updateStatus("clear","","#upload-status-" + type);
+          
           let inputFiles = $("#file-" + type).prop("files");
           
           var msg = "Uploading";
@@ -396,33 +416,38 @@
           if (inputFiles.length <= 0) {
             msg = "Empty file";
             alert("No file selected.");
-            //return;
-          }
-
-          let file = inputFiles[0];
-
-          if (!MIME_TYPES[type].includes(file["type"])) {
-            msg="Incompatible";
-            alert("Invalid file type.");
-            //return;
-          }
-
-          if (file["size"] > FILE_SIZE_LIMIT) {
-            msg="File too large";
-            alert(`File size is too large (greater than ${FILE_SIZE_LIMIT}).`)
-            //return;
-          }
-          
-          if(msg != "Uploading"){
-            //uploadStatus(msg,"input_err",type);
             updateStatus("error",msg,"#upload-status-" + type);
-            return;
+            $("#preview-image").removeAttr("src");
+            //return;
           }else{
-            //uploadStatus(msg,"uploading",type);
-             updateStatus("loading",msg,"#upload-status-" + type);
-          }
+            let file = inputFiles[0];
 
-          uploadFile(file,type);
+            if (!MIME_TYPES[type].includes(file["type"])) {
+              msg="Incompatible";
+              alert("Invalid file type.");
+              //return;
+            }
+
+            if (file["size"] > FILE_SIZE_LIMIT) {
+              msg="File too large";
+              alert(`File size is too large (greater than ${FILE_SIZE_LIMIT}).`)
+              //return;
+            }
+          
+            if(msg != "Uploading"){
+              //uploadStatus(msg,"input_err",type);
+              updateStatus("error",msg,"#upload-status-" + type);
+              $("#preview-image").removeAttr("src");
+              return;
+            }else{
+              $("#preview-image").attr("src",URL.createObjectURL(file));
+              if(submit){
+                //uploadStatus(msg,"uploading",type);
+                 updateStatus("loading",msg,"#upload-status-" + type);
+                 uploadFile(file,type);
+              }
+            }
+          }
         }
 
         function toggleBlind(isOn) {
@@ -526,14 +551,19 @@
         // Generate charts
         let chartX = generateChart($("#chart-x"), "x", []);
         let chartY = generateChart($("#chart-y"), "y", []);
+        
+        // Attach input change handlers
+        //$(document).on("change", "#file-image",onInputFile);
+        $(document).on("change", "#file-image", function() { onUploadFile("image",false); });
+        //$(document).on("change", "#btn-upload-audio", function() { onUploadFile("audio",false); });
 
         // Attach click handlers
         $(document).on("click", "#modes .btn", onModeSwitch);
         $(document).on("click", "#patterns .btn", onPatternSwitch);
         $(document).on("click", "#btn-submit-color", onColorSubmit);
         $(document).on("click", "#switch-power", onPowerSwitch);
-        $(document).on("click", "#btn-upload-image", function() { onUploadFile("image"); });
-        $(document).on("click", "#btn-upload-audio", function() { onUploadFile("audio"); });
+        $(document).on("click", "#btn-upload-image", function() { onUploadFile("image",true); });
+        $(document).on("click", "#btn-upload-audio", function() { onUploadFile("audio",true); });
         $(document).on("click", "#toggle-sidebar", onToggleSidebar);
         $(document).on("click", "#close-sidebar", onCloseSidebar);
         $(document).on("click", "#overlay", onCloseSidebar);
@@ -541,6 +571,7 @@
         
         // Set initial website state
         $("#lightstick-name").text(current["name"]);
+        $("#preview-image").attr("src","data:image/png;base64," + current["image"]);
         changeLightstick();
         toggleBlind(current.is_on);
         toggleSwitch(current.is_on);

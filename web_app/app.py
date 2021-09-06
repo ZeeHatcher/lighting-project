@@ -9,6 +9,8 @@ import sys
 import threading
 import traceback
 from werkzeug import secure_filename, abort
+import base64
+import io
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024 # 1MB maximum file size
@@ -41,6 +43,7 @@ def index():
     # Get list of lightsticks and get reported shadow state
     res_things = iot.list_things_in_thing_group(thingGroupName='lightsticks')
     for thing in res_things["things"]:
+#         print(thing)
         res_shadow = iot_data.get_thing_shadow(thingName=thing)
         byte_str = res_shadow["payload"].read()
         payload = json.loads(byte_str.decode("utf-8"))
@@ -48,9 +51,20 @@ def index():
         if payload["state"] and payload["state"]["reported"]:
             state = payload["state"]["reported"]
             state["name"] = thing
+            
+            s3 = boto3.resource("s3")
+            bucket = s3.Bucket(S3_BUCKET)
+            #s3://lighting-bucket/lightstick_cherry/image
+            object = bucket.Object(thing+'/image')
+            file_stream = io.BytesIO()
+            img_data = object.get().get('Body').read()
+#             object.download_fileobj(file_stream)
+            #"https://lighting-bucket.s3.ap-southeast-1.amazonaws.com/lightstick_cherry/image"
+            state["image"] = base64.encodebytes(img_data).decode('utf-8')
 
             lightsticks.insert(0, state)
-
+#     print(lightsticks)
+    
     return render_template("index.html", lightsticks=lightsticks, modes=modes, patterns=patterns)
 
 @app.route("/lightstick/<name>/data")
