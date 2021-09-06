@@ -27,8 +27,13 @@ from PIL import Image
 from audio_analyzer import *
 import numpy as np
 import librosa
-from pydub.utils import mediainfo
 import pygame
+# from audio_analyzer import *
+from pydub.utils import mediainfo
+import pyaudio
+import audioop
+import wave
+from gradient_generator import *
 
 # Serial/Wireless/Virtual output
 import select
@@ -100,59 +105,161 @@ class NullMode(Mode):
     def exit(self):
         pass
 
-class MusicMode(Mode):
-    def __init__(self):
-        #/home/pi/Music/ftc2.ogg
-        filename = r"audio"
-        
-        self._analyzer = AudioAnalyzer(NUM_PIXELS)
-        self._analyzer.load(filename)
-        
-        pygame.init()
-        t=pygame.time.get_ticks()
-        self._getTicksLastFrame = t
-        
-        self._timeCount = 0
-        
-#         file = wave.open(filename)
-#         freq = file.getframerate()
-        info = mediainfo(filename)
-        freq = int(info["sample_rate"])
-#         print(freq)
-        
-        #quit to reset the initial
-        pygame.mixer.quit()
-        pygame.mixer.init(frequency=freq)
-        pygame.mixer.music.load(filename)
-        pygame.mixer.music.play()
 
+class MusicMode(Mode):
+#     https://stackoverflow.com/questions/19529230/mp3-with-pyaudio?rq=1
+    def __init__(self):
+        #/home/pi/Music/ftc2.ogg or audio
+        filename = r"/home/pi/Music/ftc.wav"
+        self._wf = wave.open(filename,'rb')
+        
+        #Spits out tons of errors
+        #AudioPort emulating errors (not our concern)
+        self._p = pyaudio.PyAudio()
+        
+        self._chunk = 1024
+        self._format = self._p.get_format_from_width(self._wf.getsampwidth())
+        self._channels = self._wf.getnchannels()
+        self._rate = self._wf.getframerate()
+        #32767(max data for 16bit integer 2^15 -1)
+        self._max = int(32767 * 1.1)
+        self._lastHeartBeat = time.time()
+        self._increaseHeartBeat = True
+        self._start = 0
+
+        array1 = get_gradient_3d(NUM_PIXELS,1,(252,92,125),(106,130,251),(True,True,True))
+        self._r = [int(val[0]) for val in array1[0]] #+ [int(val[0]) for val in array2[0]]
+        self._g = [int(val[1]) for val in array1[0]] #+ [int(val[1]) for val in array2[0]]
+        self._b = [int(val[2]) for val in array1[0]] #+ [int(val[2]) for val in array2[0]]
+        
+        self._stream = self._p.open(format = self._format,
+                              channels = self._channels,
+                              rate = self._rate,
+                              output = True,
+                              frames_per_buffer = self._chunk
+                              )
+    
     def run(self):
-        colors = locked_data.shadow_state["colors"]
-        color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
+#         colors = locked_data.shadow_state["colors"]
+#         color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
         c_r = bytearray([0] * NUM_PIXELS)
         c_g = bytearray([0] * NUM_PIXELS)
         c_b = bytearray([0] * NUM_PIXELS)
-
-        if(pygame.mixer.music.get_busy()):
-            try:
-#                 t = pygame.time.get_ticks()
-#                 deltaTime = (t - self._getTicksLastFrame)/1000.0
-#                 self._getTicksLastFrame = deltaTime
-#                 
-#                 self._timeCount += deltaTime
-                percentage = int(self._analyzer.update(pygame.mixer.music.get_pos()/1000.0))
-
-                c_r[0:percentage] = bytearray([color.r] * percentage)
-                c_g[0:percentage] = bytearray([color.g] * percentage)
-                c_b[0:percentage] = bytearray([color.b] * percentage)
-            except IndexError:
-                c_r = bytearray([0] * NUM_PIXELS)
-                c_g = bytearray([0] * NUM_PIXELS)
-                c_b = bytearray([0] * NUM_PIXELS)
+ 
+        data = self._wf.readframes(self._chunk)
+        sound = 0
+        silence = chr(0)*self._chunk*self._channels*2
+        if len(data) >0:        
+#             if(data == ''):
+#                 data = self._silence
+            self._stream.write(data)
+            reading = audioop.max(data,2)
+            sound += reading
+            percentage = int(sound/self._max * NUM_PIXELS)
+            
+            #Prevent statis on the music bar
+            minimum = int(0.05 * NUM_PIXELS)
+            if(time.time() - self._lastHeartBeat > 0.1 and percentage >0):
+#                 print("Sending heartbeat")
+                if(percentage < minimum):
+                    self._increaseHeartBeat = True
+                if(percentage > (NUM_PIXELS - minimum)):
+                    self._increaseHeartBeat = False
+                    
+                if(self._increaseHeartBeat):
+                    percentage += minimum
+                    self._increaseHeartBeat = False
+                else:
+                    percentage -= minimum
+                    self._increaseHeartBeat = True
+                self._lastHeartBeat = time.time()
+    
+            c_r[0:percentage] = bytearray(self._r[0:percentage])
+            c_g[0:percentage] = bytearray(self._g[0:percentage])
+            c_b[0:percentage] = bytearray(self._b[0:percentage])
+                
         return c_r,c_g,c_b
     
     def exit(self):
-        pass
+#         pass
+        self._stream.stop_stream()
+        self._stream.close()
+        print("Closed stream")
+        self._wf.close()
+        print("Closed wave")
+        self._p.terminate()
+        print("PyAudio Terminated")
+
+class AudioMode(Mode):
+    def __init__(self):
+        self._chunk = 1024
+        self._format = pyaudio.paInt16
+        self._channels = 2
+        self._rate = 44100
+        #32767(max data for 16bit integer) * 2
+        self._max = 65534
+        self._dev_index = 0
+        
+        half_pixels = int(NUM_PIXELS/2)
+        array1 = get_gradient_3d(half_pixels,1,(30,150,0),(255,242,0),(True,True,True))
+        array2 = get_gradient_3d((NUM_PIXELS - half_pixels),1,(255,242,0),(255,0,0),(True,True,True))
+        self._r = [int(val[0]) for val in array1[0]] + [int(val[0]) for val in array2[0]]
+        self._g = [int(val[1]) for val in array1[0]] + [int(val[1]) for val in array2[0]]
+        self._b = [int(val[2]) for val in array1[0]] + [int(val[2]) for val in array2[0]]
+        
+        self._p = pyaudio.PyAudio()
+        
+        for ii in range(self._p.get_device_count()):
+#             print(p.get_device_info_by_index(ii).get('name'))
+            dev = self._p.get_device_info_by_index(ii)
+            if(dev['maxInputChannels']>1):
+                print('Using the first compatible audio device detected:')
+                print((ii,dev['name'],dev['maxInputChannels']))
+                self._dev_index = ii
+#                 if(dev['maxInputChannels']>1):
+#                     self._channels = 2
+                break
+            
+        self._stream = self._p.open(format = self._format,
+                              channels = self._channels,
+                              input_device_index = self._dev_index,
+                              rate = self._rate,
+                              input = True,
+                              output = True,
+                              frames_per_buffer=self._chunk
+                              )
+
+    def run(self):
+#         colors = locked_data.shadow_state["colors"]
+#         color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
+        c_r = bytearray([0] * NUM_PIXELS)
+        c_g = bytearray([0] * NUM_PIXELS)
+        c_b = bytearray([0] * NUM_PIXELS)
+        
+        sound = 0
+        for i in range(0,2):
+            data = self._stream.read(self._chunk)
+            reading = audioop.max(data,2)
+            sound += reading
+            time.sleep(.0001)
+        
+        if(len(data) > 0):
+            percentage = int(sound/self._max * NUM_PIXELS)
+#             print(percentage)
+            c_r[0:percentage] = bytearray(self._r[0:percentage])
+            c_g[0:percentage] = bytearray(self._g[0:percentage])
+            c_b[0:percentage] = bytearray(self._b[0:percentage])
+        
+        return c_r,c_g,c_b
+        
+    def exit(self):
+#         pass
+        self._stream.stop_stream()
+        self._stream.close()
+        print("Closed stream")
+        self._p.terminate()
+        print("PyAudio Terminated")
+
 
 class BasicMode(Mode):
     def __init__(self):
@@ -240,6 +347,14 @@ class LightsaberMode(Mode):
     def __init__(self):
         self._thread = None
         self.v = Value("I", 0)
+        #1 = red, 2 = green, 3 = blue
+        self._type = "blue"
+        #0 = off, 1 = on, 2 = idle
+        self._phase = 1
+        self._pixels = 0
+        pygame.init()
+        
+#         locked_data.shadow_state["pattern"]
 
     def run(self):
         if ser != None:
@@ -628,6 +743,8 @@ def loop():
             mode = ImageMode()
         elif new_mode_id == 3:
             mode = MusicMode()
+        elif new_mode_id == 4:
+            mode = AudioMode()
         elif new_mode_id == 5:
             mode = LightsaberMode()
         else:
