@@ -110,17 +110,18 @@ class MusicMode(Mode):
 #     https://stackoverflow.com/questions/19529230/mp3-with-pyaudio?rq=1
     def __init__(self):
         #/home/pi/Music/ftc2.ogg or audio
-        filename = r"/home/pi/Music/boys.wav"
+        filename = r"/home/pi/Music/ftc.wav"
         try:
             self._wf = wave.open(filename,'rb')
         except:
             new_filename = r"/home/pi/Music/"+"hey"+"_updated.wav"
-            subprocess.call('ffmpeg -i '+ filename+ ' ' + new_filename, shell=True)
+            subprocess.call('ffmpeg -y -i '+ filename+ ' ' + new_filename, shell=True)
             self._wf = wave.open(new_filename,'rb')
         #Spits out tons of errors
         #AudioPort emulating errors (not our concern)
         self._p = pyaudio.PyAudio()
         
+#         self._chunk = 1024
         self._format = self._p.get_format_from_width(self._wf.getsampwidth())
         self._channels = self._wf.getnchannels()
         self._rate = self._wf.getframerate()
@@ -129,7 +130,7 @@ class MusicMode(Mode):
             self._chunk = 1024
         else:
             self._chunk = 4096
-        
+
         #32767(max data for 16bit integer 2^15 -1)
         self._max = int(32767 * 1.1)
         self._lastHeartBeat = time.time()
@@ -837,7 +838,7 @@ def loop():
         lightstick.update(c_r, c_g, c_b)
 
     # Limit to 30 frames per second
-    time.sleep(0.034)
+#     time.sleep(0.034)
 
 
 
