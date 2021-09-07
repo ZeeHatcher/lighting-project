@@ -24,20 +24,17 @@ from colorsys import hls_to_rgb
 from PIL import Image
 
 # Music Mode
-from audio_analyzer import *
 import numpy as np
 import librosa
 import pygame
-# from audio_analyzer import *
 from pydub.utils import mediainfo
 import pyaudio
 import audioop
 import wave
-from gradient_generator import *
+from gradient_generator import get_gradient_3d
 
-# Serial/Wireless/Virtual output
+# Wireless/Virtual output
 import select
-import serial
 import socket
 from virtual import VirtualLightstick
 
@@ -52,7 +49,6 @@ CLIENT_ID = os.environ.get("CLIENT_ID") or str(uuid4())
 S3_BUCKET = os.environ.get("S3_BUCKET")
 THING_NAME = os.environ.get("THING_NAME")
 
-ser = None
 lightstick = None
 
 mode_id = None
@@ -110,7 +106,7 @@ class MusicMode(Mode):
 #     https://stackoverflow.com/questions/19529230/mp3-with-pyaudio?rq=1
     def __init__(self):
         #/home/pi/Music/ftc2.ogg or audio
-        filename = r"/home/pi/Music/ftc.wav"
+        filename = r"./audio"
         self._wf = wave.open(filename,'rb')
         
         #Spits out tons of errors
@@ -241,7 +237,7 @@ class AudioMode(Mode):
             data = self._stream.read(self._chunk)
             reading = audioop.max(data,2)
             sound += reading
-            time.sleep(.0001)
+            # time.sleep(.0001)
         
         if(len(data) > 0):
             percentage = int(sound/self._max * NUM_PIXELS)
@@ -435,8 +431,6 @@ class DotPattern(Pattern):
 
         self._i += self._dir
 
-        time.sleep(0.1)
-
         return c_r, c_g, c_b
         
 class WavePattern(Pattern):
@@ -467,8 +461,6 @@ class WavePattern(Pattern):
         if self._i == 0 and not self._ascending:
             self._ascending = True
 
-        time.sleep(0.1)
-
         return c_r, c_g, c_b
 
 class BreathePattern(Pattern):
@@ -498,8 +490,6 @@ class BreathePattern(Pattern):
             self._mult = 0.0
             self._fade_in = True
 
-        time.sleep(0.1)
-        
         return c_r, c_g, c_b
     
 class BlinkPattern(Pattern):
@@ -526,7 +516,7 @@ class BlinkPattern(Pattern):
         c_r = bytearray([color.r] * NUM_PIXELS)
         c_g = bytearray([color.g] * NUM_PIXELS)
         c_b = bytearray([color.b] * NUM_PIXELS)
-        time.sleep(0.1)
+        
         return c_r, c_g, c_b
     
 class RainbowPattern(Pattern):
@@ -548,8 +538,6 @@ class RainbowPattern(Pattern):
         self._r_vals.insert(0,self._r_vals.pop())
         self._b_vals.insert(0,self._b_vals.pop())
         self._g_vals.insert(0,self._g_vals.pop())
-        
-        time.sleep(0.1)
                  
         return c_r, c_g, c_b
         
@@ -813,16 +801,6 @@ def loop():
             s.close()
             print("Closed.")
 
-    # Serial output
-    if ser != None:
-        # Clear buffers for clean input and output
-        ser.reset_input_buffer()
-        ser.reset_output_buffer()
-
-        ser.write(c_r)
-        ser.write(c_g)
-        ser.write(c_b)
-
     # Virtual output
     if lightstick != None:
         lightstick.update(c_r, c_g, c_b)
@@ -843,8 +821,8 @@ if __name__ == "__main__":
 
     sockets = [server_socket]
 
-    # ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
     lightstick = VirtualLightstick(NUM_PIXELS)
+
     s3 = boto3.client("s3")
 
     # Short delay to let serial setup properly
