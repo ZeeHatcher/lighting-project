@@ -304,9 +304,10 @@ class ImageMode(Mode):
         if im.mode == "P":
             im = im.convert("RGB")
 
-        # Resize image while keeping aspect ratio
-        ratio = im.height / im.width
-        im = im.resize((NUM_PIXELS, round(NUM_PIXELS * ratio)))
+        # Resize image while keeping aspect ratio if image width is larger than NUM_PIXELS
+        if im.width > NUM_PIXELS:
+            ratio = im.height / im.width
+            im = im.resize((NUM_PIXELS, round(NUM_PIXELS * ratio)))
 
         rows = [] # 3D-Array: Rows -> Channels -> Color
 
@@ -317,11 +318,16 @@ class ImageMode(Mode):
                 rows[y].append([]) # Initialize channel arrays
 
             # Fill channel arrays with color data
-            for x in range(im.width):
-                colors = im.getpixel((x, y))
+            for x in range(NUM_PIXELS):
+                if x < im.width:
+                    colors = im.getpixel((x, y))
 
-                for c in range(3):
-                    rows[y][c].append(colors[c])
+                    for c in range(3):
+                        rows[y][c].append(colors[c])
+
+                else:
+                    for c in range(3):
+                        rows[y][c].append(0)
 
         im.close()
 
