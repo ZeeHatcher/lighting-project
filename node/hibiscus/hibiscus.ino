@@ -89,7 +89,8 @@ void loop() {
     client.print(",");
     client.print(event.gyro.y);
     client.print(",");
-    client.println(event.gyro.z);
+    client.print(event.gyro.z);
+    client.print("|");
 
     // Limit loop rate to 30 frames per second
     delay(34);
