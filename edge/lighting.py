@@ -1,28 +1,42 @@
 from abc import ABC, abstractmethod
+from dotenv import load_dotenv
+import json
+from multiprocessing import Value
+import os
+import random
+import sys
+import threading
+import time
+import traceback
+
+# Cloud connectivity
 from awscrt import auth, io, mqtt, http
 from awsiot import iotshadow
 from awsiot import mqtt_connection_builder
 import boto3
 from concurrent.futures import Future
-from dotenv import load_dotenv
-import json
-from multiprocessing import Value
-from PIL import Image
-import os
-import random
-import serial
-import sys
-import threading
-import time
-import traceback
 from uuid import uuid4
-from virtual import VirtualLightstick
+
+# Basic Mode
 from colorsys import hls_to_rgb
+
+# Image Mode
+from PIL import Image
+
+# Music Mode
 import numpy as np
 import librosa
 import pygame
-from audio_analyzer import *
 from pydub.utils import mediainfo
+import pyaudio
+import audioop
+import wave
+from gradient_generator import get_gradient_3d
+
+# Wireless/Virtual output
+import select
+import socket
+from virtual import VirtualLightstick
 
 load_dotenv()
 
@@ -35,7 +49,6 @@ CLIENT_ID = os.environ.get("CLIENT_ID") or str(uuid4())
 S3_BUCKET = os.environ.get("S3_BUCKET")
 THING_NAME = os.environ.get("THING_NAME")
 
-ser = None
 lightstick = None
 
 mode_id = None
@@ -88,59 +101,161 @@ class NullMode(Mode):
     def exit(self):
         pass
 
-class MusicMode(Mode):
-    def __init__(self):
-        #/home/pi/Music/ftc2.ogg
-        filename = r"audio"
-        
-        self._analyzer = AudioAnalyzer(NUM_PIXELS)
-        self._analyzer.load(filename)
-        
-        pygame.init()
-        t=pygame.time.get_ticks()
-        self._getTicksLastFrame = t
-        
-        self._timeCount = 0
-        
-#         file = wave.open(filename)
-#         freq = file.getframerate()
-        info = mediainfo(filename)
-        freq = int(info["sample_rate"])
-#         print(freq)
-        
-        #quit to reset the initial
-        pygame.mixer.quit()
-        pygame.mixer.init(frequency=freq)
-        pygame.mixer.music.load(filename)
-        pygame.mixer.music.play()
 
+class MusicMode(Mode):
+#     https://stackoverflow.com/questions/19529230/mp3-with-pyaudio?rq=1
+    def __init__(self):
+        #/home/pi/Music/ftc2.ogg or audio
+        filename = r"./audio"
+        self._wf = wave.open(filename,'rb')
+        
+        #Spits out tons of errors
+        #AudioPort emulating errors (not our concern)
+        self._p = pyaudio.PyAudio()
+        
+        self._chunk = 1024
+        self._format = self._p.get_format_from_width(self._wf.getsampwidth())
+        self._channels = self._wf.getnchannels()
+        self._rate = self._wf.getframerate()
+        #32767(max data for 16bit integer 2^15 -1)
+        self._max = int(32767 * 1.1)
+        self._lastHeartBeat = time.time()
+        self._increaseHeartBeat = True
+        self._start = 0
+
+        array1 = get_gradient_3d(NUM_PIXELS,1,(252,92,125),(106,130,251),(True,True,True))
+        self._r = [int(val[0]) for val in array1[0]] #+ [int(val[0]) for val in array2[0]]
+        self._g = [int(val[1]) for val in array1[0]] #+ [int(val[1]) for val in array2[0]]
+        self._b = [int(val[2]) for val in array1[0]] #+ [int(val[2]) for val in array2[0]]
+        
+        self._stream = self._p.open(format = self._format,
+                              channels = self._channels,
+                              rate = self._rate,
+                              output = True,
+                              frames_per_buffer = self._chunk
+                              )
+    
     def run(self):
-        colors = locked_data.shadow_state["colors"]
-        color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
+#         colors = locked_data.shadow_state["colors"]
+#         color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
         c_r = bytearray([0] * NUM_PIXELS)
         c_g = bytearray([0] * NUM_PIXELS)
         c_b = bytearray([0] * NUM_PIXELS)
-
-        if(pygame.mixer.music.get_busy()):
-            try:
-#                 t = pygame.time.get_ticks()
-#                 deltaTime = (t - self._getTicksLastFrame)/1000.0
-#                 self._getTicksLastFrame = deltaTime
-#                 
-#                 self._timeCount += deltaTime
-                percentage = int(self._analyzer.update(pygame.mixer.music.get_pos()/1000.0))
-
-                c_r[0:percentage] = bytearray([color.r] * percentage)
-                c_g[0:percentage] = bytearray([color.g] * percentage)
-                c_b[0:percentage] = bytearray([color.b] * percentage)
-            except IndexError:
-                c_r = bytearray([0] * NUM_PIXELS)
-                c_g = bytearray([0] * NUM_PIXELS)
-                c_b = bytearray([0] * NUM_PIXELS)
+ 
+        data = self._wf.readframes(self._chunk)
+        sound = 0
+        silence = chr(0)*self._chunk*self._channels*2
+        if len(data) >0:        
+#             if(data == ''):
+#                 data = self._silence
+            self._stream.write(data)
+            reading = audioop.max(data,2)
+            sound += reading
+            percentage = int(sound/self._max * NUM_PIXELS)
+            
+            #Prevent statis on the music bar
+            minimum = int(0.05 * NUM_PIXELS)
+            if(time.time() - self._lastHeartBeat > 0.1 and percentage >0):
+#                 print("Sending heartbeat")
+                if(percentage < minimum):
+                    self._increaseHeartBeat = True
+                if(percentage > (NUM_PIXELS - minimum)):
+                    self._increaseHeartBeat = False
+                    
+                if(self._increaseHeartBeat):
+                    percentage += minimum
+                    self._increaseHeartBeat = False
+                else:
+                    percentage -= minimum
+                    self._increaseHeartBeat = True
+                self._lastHeartBeat = time.time()
+    
+            c_r[0:percentage] = bytearray(self._r[0:percentage])
+            c_g[0:percentage] = bytearray(self._g[0:percentage])
+            c_b[0:percentage] = bytearray(self._b[0:percentage])
+                
         return c_r,c_g,c_b
     
     def exit(self):
-        pass
+#         pass
+        self._stream.stop_stream()
+        self._stream.close()
+        print("Closed stream")
+        self._wf.close()
+        print("Closed wave")
+        self._p.terminate()
+        print("PyAudio Terminated")
+
+class AudioMode(Mode):
+    def __init__(self):
+        self._chunk = 1024
+        self._format = pyaudio.paInt16
+        self._channels = 2
+        self._rate = 44100
+        #32767(max data for 16bit integer) * 2
+        self._max = 65534
+        self._dev_index = 0
+        
+        half_pixels = int(NUM_PIXELS/2)
+        array1 = get_gradient_3d(half_pixels,1,(30,150,0),(255,242,0),(True,True,True))
+        array2 = get_gradient_3d((NUM_PIXELS - half_pixels),1,(255,242,0),(255,0,0),(True,True,True))
+        self._r = [int(val[0]) for val in array1[0]] + [int(val[0]) for val in array2[0]]
+        self._g = [int(val[1]) for val in array1[0]] + [int(val[1]) for val in array2[0]]
+        self._b = [int(val[2]) for val in array1[0]] + [int(val[2]) for val in array2[0]]
+        
+        self._p = pyaudio.PyAudio()
+        
+        for ii in range(self._p.get_device_count()):
+#             print(p.get_device_info_by_index(ii).get('name'))
+            dev = self._p.get_device_info_by_index(ii)
+            if(dev['maxInputChannels']>1):
+                print('Using the first compatible audio device detected:')
+                print((ii,dev['name'],dev['maxInputChannels']))
+                self._dev_index = ii
+#                 if(dev['maxInputChannels']>1):
+#                     self._channels = 2
+                break
+            
+        self._stream = self._p.open(format = self._format,
+                              channels = self._channels,
+                              input_device_index = self._dev_index,
+                              rate = self._rate,
+                              input = True,
+                              output = True,
+                              frames_per_buffer=self._chunk
+                              )
+
+    def run(self):
+#         colors = locked_data.shadow_state["colors"]
+#         color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
+        c_r = bytearray([0] * NUM_PIXELS)
+        c_g = bytearray([0] * NUM_PIXELS)
+        c_b = bytearray([0] * NUM_PIXELS)
+        
+        sound = 0
+        for i in range(0,2):
+            data = self._stream.read(self._chunk)
+            reading = audioop.max(data,2)
+            sound += reading
+            # time.sleep(.0001)
+        
+        if(len(data) > 0):
+            percentage = int(sound/self._max * NUM_PIXELS)
+#             print(percentage)
+            c_r[0:percentage] = bytearray(self._r[0:percentage])
+            c_g[0:percentage] = bytearray(self._g[0:percentage])
+            c_b[0:percentage] = bytearray(self._b[0:percentage])
+        
+        return c_r,c_g,c_b
+        
+    def exit(self):
+#         pass
+        self._stream.stop_stream()
+        self._stream.close()
+        print("Closed stream")
+        self._p.terminate()
+        print("PyAudio Terminated")
+
 
 class BasicMode(Mode):
     def __init__(self):
@@ -324,8 +439,6 @@ class DotPattern(Pattern):
 
         self._i += self._dir
 
-        time.sleep(0.1)
-
         return c_r, c_g, c_b
         
 class WavePattern(Pattern):
@@ -356,8 +469,6 @@ class WavePattern(Pattern):
         if self._i == 0 and not self._ascending:
             self._ascending = True
 
-        time.sleep(0.1)
-
         return c_r, c_g, c_b
 
 class BreathePattern(Pattern):
@@ -387,8 +498,6 @@ class BreathePattern(Pattern):
             self._mult = 0.0
             self._fade_in = True
 
-        time.sleep(0.1)
-        
         return c_r, c_g, c_b
     
 class BlinkPattern(Pattern):
@@ -415,7 +524,7 @@ class BlinkPattern(Pattern):
         c_r = bytearray([color.r] * NUM_PIXELS)
         c_g = bytearray([color.g] * NUM_PIXELS)
         c_b = bytearray([color.b] * NUM_PIXELS)
-        time.sleep(0.1)
+        
         return c_r, c_g, c_b
     
 class RainbowPattern(Pattern):
@@ -437,8 +546,6 @@ class RainbowPattern(Pattern):
         self._r_vals.insert(0,self._r_vals.pop())
         self._b_vals.insert(0,self._b_vals.pop())
         self._g_vals.insert(0,self._g_vals.pop())
-        
-        time.sleep(0.1)
                  
         return c_r, c_g, c_b
         
@@ -451,9 +558,12 @@ def exit(msg_or_exception):
     else:
         print("Exiting:", msg_or_exception)
 
-    print("Disconnecting...")
+    print("Disconnecting... ", end="")
     if mode != None:
         mode.exit()
+
+    for s in sockets:
+        s.close()
 
     future = mqtt_connection.disconnect()
     future.add_done_callback(on_disconnected)
@@ -559,9 +669,9 @@ def download_file(file_type):
     global mode, mode_id
     key = THING_NAME + "/" + file_type
 
-    print("Downloading %s..." % file_type)
+    print("Downloading %s... " % file_type, end="")
     s3.download_file(S3_BUCKET, key, file_type)
-    print("Finished downloading %s." % file_type)
+    print("Finished.")
 
     # Reset mode to load in newly downloaded image
     if mode_id == 2 and file_type == "image":
@@ -573,8 +683,6 @@ def start_download_thread(file_type):
     thread.start()
 
 def publish_sensors_data(v):
-    print("Started publish thread.")
-
     t = threading.currentThread()
     while getattr(t, "is_run", True):
         topic = "lightstick/" + THING_NAME + "/data"
@@ -600,7 +708,7 @@ def change_local_state(new_state):
             locked_data.shadow_state[p] = new_state[p]
 
 def change_shadow_state():
-    print("Updating reported shadow value.")
+    print("Updating reported shadow value...")
     reported = {}
     with locked_data.lock:
         reported = locked_data.shadow_state
@@ -633,6 +741,8 @@ def loop():
             mode = ImageMode()
         elif new_mode_id == 3:
             mode = MusicMode()
+        elif new_mode_id == 4:
+            mode = AudioMode()
         elif new_mode_id == 5:
             mode = LightsaberMode()
         else:
@@ -642,33 +752,89 @@ def loop():
 
     c_r, c_g, c_b = mode.run()
 
-    if ser != None:
-        if ser.in_waiting and mode_id == 5:
-            l = ser.readline().decode("utf-8").strip()
-            print(l)
+    # mode.values = tuple(map(lambda v: float(v), l.split(",")))
 
-            if first == True:
-                print("Discard first")
-                first = False
+    # Wireless output
+    readable, writable, exceptional = select.select(sockets, sockets, sockets)
+
+    for s in readable:
+        if s is server_socket: # New client is attempting connection to server
+            print("New client detected.")
+            client_socket, address = server_socket.accept()
+            sockets.append(client_socket)
+
+        else: # Client has sent data
+            try:
+                data = s.recv(64)
+
+            except ConnectionResetError:
+                print("Connection reset by peer.")
+
+                if s in sockets:
+                    print("Closing client... ", end="")
+                    s.close()
+                    sockets.remove(s)
+                    print("Closed.")
+
             else:
-                mode.values = tuple(map(lambda v: float(v), l.split(",")))
+                if data:
+                    print(data)
 
-        # Clear buffers for clean input and output
-        ser.reset_input_buffer()
-        ser.reset_output_buffer()
+                else:
+                    print("Received 0 bytes. Connection to client is closed.")
 
-        # ser.write(c_r)
-        # ser.write(c_g)
-        # ser.write(c_b)
+                    if s in sockets:
+                        print("Closing client... ", end="")
+                        s.close()
+                        sockets.remove(s)
+                        print("Closed.")
 
+    for s in writable:
+        try:
+            s.sendall(c_r)
+            s.sendall(c_g)
+            s.sendall(c_b)
+
+        except socket.error: # Connection closed
+            print("Error occured while writing to client.")
+
+            if s in sockets:
+                print("Closing client... ", end="")
+                sockets.remove(s)
+                s.close()
+                print("Closed.")
+
+    for s in exceptional:
+        print("An exception occured.")
+
+        if s in sockets:
+            print("Closing client... ", end="")
+            sockets.remove(s)
+            s.close()
+            print("Closed.")
+
+    # Virtual output
     if lightstick != None:
         lightstick.update(c_r, c_g, c_b)
+
+    # Limit to 30 frames per second
+    time.sleep(0.034)
 
 
 
 if __name__ == "__main__":
-    ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
+    # Create TCP/IP socket
+    print("Intializing TCP server... ", end="")
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket.bind(("", 12345))
+    server_socket.listen(1)
+    print("Initialized.")
+
+    sockets = [server_socket]
+
     lightstick = VirtualLightstick(NUM_PIXELS)
+
     s3 = boto3.client("s3")
 
     # Short delay to let serial setup properly
@@ -690,8 +856,8 @@ if __name__ == "__main__":
         clean_session=False,
         keep_alive_secs=6)
 
-    print("Connecting to {} with client ID '{}'...".format(
-        os.environ.get("THING_ENDPOINT"), CLIENT_ID))
+    print("Connecting to {} with client ID '{}'... ".format(
+        os.environ.get("THING_ENDPOINT"), CLIENT_ID), end="")
 
     connected_future = mqtt_connection.connect()
 
@@ -699,11 +865,11 @@ if __name__ == "__main__":
 
     # Wait for connection to be fully established.
     connected_future.result()
-    print("Connected!")
+    print("Connected.")
 
     try:
         # Subscribe to topics: delta, update_success, update_rejected, get_success, get_rejected
-        print("Subscribing to Delta events...")
+        print("Subscribing to Delta events... ", end="")
         delta_subscribed_future, _ = shadow_client.subscribe_to_shadow_delta_updated_events(
             request=iotshadow.ShadowDeltaUpdatedSubscriptionRequest(thing_name=THING_NAME),
             qos=mqtt.QoS.AT_LEAST_ONCE,
@@ -711,8 +877,9 @@ if __name__ == "__main__":
 
         # Wait for subscription to succeed
         delta_subscribed_future.result()
+        print("Subscribed.")
 
-        print("Subscribing to Update responses...")
+        print("Subscribing to Update responses... ", end="")
         update_accepted_subscribed_future, _ = shadow_client.subscribe_to_update_shadow_accepted(
             request=iotshadow.UpdateShadowSubscriptionRequest(thing_name=THING_NAME),
             qos=mqtt.QoS.AT_LEAST_ONCE,
@@ -726,8 +893,9 @@ if __name__ == "__main__":
         # Wait for subscriptions to succeed
         update_accepted_subscribed_future.result()
         update_rejected_subscribed_future.result()
+        print("Subscribed.")
 
-        print("Subscribing to Get responses...")
+        print("Subscribing to Get responses... ", end="")
         get_accepted_subscribed_future, _ = shadow_client.subscribe_to_get_shadow_accepted(
             request=iotshadow.GetShadowSubscriptionRequest(thing_name=THING_NAME),
             qos=mqtt.QoS.AT_LEAST_ONCE,
@@ -741,15 +909,17 @@ if __name__ == "__main__":
         # Wait for subscriptions to succeed
         get_accepted_subscribed_future.result()
         get_rejected_subscribed_future.result()
+        print("Subscribed.")
 
         # Issue request for shadow's current state.
-        print("Requesting current shadow state...")
+        print("Requesting current shadow state... ", end="")
         publish_get_future = shadow_client.publish_get_shadow(
             request=iotshadow.GetShadowRequest(thing_name=THING_NAME),
             qos=mqtt.QoS.AT_LEAST_ONCE)
 
         # Ensure that publish succeeds
         publish_get_future.result()
+        print("Received.")
 
         while (True):
             loop()

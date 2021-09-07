@@ -7,6 +7,7 @@ body {
   background-color: #262a33;
   color: #e5f7ef;
   cursor: default;
+  overflow: hidden;
 }
 
 h1{
@@ -185,4 +186,9 @@ h2, h3, h4, h5, h6 {
 
 .text-muted {
   color: #526777!important;
+}
+
+#preview-image{
+  max-width: 50vw;
+  max-height: 37vh;
 }
