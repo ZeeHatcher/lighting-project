@@ -28,7 +28,7 @@ import numpy as np
 import librosa
 import pygame
 # from audio_analyzer import *
-from pydub.utils import mediainfo
+from pydub import AudioSegment
 import pyaudio
 import audioop
 import wave
@@ -110,13 +110,17 @@ class MusicMode(Mode):
 #     https://stackoverflow.com/questions/19529230/mp3-with-pyaudio?rq=1
     def __init__(self):
         #/home/pi/Music/ftc2.ogg or audio
-        filename = r"/home/pi/Music/ftc.wav"
+        filename = r"audio"
         try:
             self._wf = wave.open(filename,'rb')
         except:
-            new_filename = r"/home/pi/Music/"+"hey"+"_updated.wav"
-            subprocess.call('ffmpeg -y -i '+ filename+ ' ' + new_filename, shell=True)
-            self._wf = wave.open(new_filename,'rb')
+            print("Incompatible format, converting file")
+#             new_filename = r"/home/pi/Music/updated"
+            new_file = AudioSegment.from_mp3(filename)
+            new_file.export(filename,format="wav")
+#             subprocess.call('ffmpeg -y -i '+ filename+ ' ' + new_filename, shell=True)
+            self._wf = wave.open(filename,'rb')
+            
         #Spits out tons of errors
         #AudioPort emulating errors (not our concern)
         self._p = pyaudio.PyAudio()
