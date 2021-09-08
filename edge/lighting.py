@@ -25,7 +25,6 @@ from PIL import Image
 
 # Music Mode
 import numpy as np
-import librosa
 import pygame
 from pydub.utils import mediainfo
 import pyaudio
