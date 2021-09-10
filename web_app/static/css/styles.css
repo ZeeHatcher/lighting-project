@@ -7,7 +7,6 @@ body {
   background-color: #262a33;
   color: #e5f7ef;
   cursor: default;
-  overflow: hidden;
 }
 
 h1{
@@ -191,4 +190,28 @@ h2, h3, h4, h5, h6 {
 #preview-image{
   max-width: 50vw;
   max-height: 37vh;
+}
+
+#login-section{
+	max-width: 80vw;
+	min-width: 30vw;
+	border-radius:25px;
+}
+
+.text-input{
+	border-radius:0;
+  box-shadow:none;
+}
+
+.text-input:hover,
+.text-input:focus,
+.text-input:active{
+  box-shadow:none;
+}
+
+.text-input:-webkit-autofill,
+.text-input:-webkit-autofill:hover, 
+.text-input:-webkit-autofill:focus,
+.text-input:-webkit-autofill-active{
+  transition:background-color 5000s;
 }

@@ -33,7 +33,6 @@ import pyaudio
 import audioop
 import wave
 from gradient_generator import *
-import subprocess
 
 # Serial/Wireless/Virtual output
 import select

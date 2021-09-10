@@ -203,12 +203,14 @@
         let lightsticks = {{ lightsticks|tojson }};
         let modes = {{ modes|tojson }};
         let patterns = {{ patterns|tojson }};
+        let user = {{username|tojson}};
+        //alert(user);
 
         let currentIndex = 0;
         let current = lightsticks[currentIndex];
 
         let intervalId = null;
-
+        
         function stopInterval(id) {
           if (id != null) {
             clearInterval(id);
@@ -556,14 +558,19 @@
         //$(document).on("change", "#file-image",onInputFile);
         $(document).on("change", "#file-image", function() { onUploadFile("image",false); });
         //$(document).on("change", "#btn-upload-audio", function() { onUploadFile("audio",false); });
-
-        // Attach click handlers
-        $(document).on("click", "#modes .btn", onModeSwitch);
-        $(document).on("click", "#patterns .btn", onPatternSwitch);
-        $(document).on("click", "#btn-submit-color", onColorSubmit);
-        $(document).on("click", "#switch-power", onPowerSwitch);
-        $(document).on("click", "#btn-upload-image", function() { onUploadFile("image",true); });
-        $(document).on("click", "#btn-upload-audio", function() { onUploadFile("audio",true); });
+        
+        // Attach click handlers for admin users
+        if(user == "admin"){
+          $(document).on("click", "#modes .btn", onModeSwitch);
+          $(document).on("click", "#patterns .btn", onPatternSwitch);
+          $(document).on("click", "#btn-submit-color", onColorSubmit);
+          $(document).on("click", "#switch-power", onPowerSwitch);
+          $(document).on("click", "#btn-upload-image", function() { onUploadFile("image",true); });
+          $(document).on("click", "#btn-upload-audio", function() { onUploadFile("audio",true); });
+        }else{
+          //disable file input for non admin users
+          $(".form-control-file").prop("disabled",true);
+        }
         $(document).on("click", "#toggle-sidebar", onToggleSidebar);
         $(document).on("click", "#close-sidebar", onCloseSidebar);
         $(document).on("click", "#overlay", onCloseSidebar);

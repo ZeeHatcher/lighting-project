@@ -12,35 +12,20 @@ from werkzeug import secure_filename, abort
 import base64
 import io
 import requests
+from uuid import uuid4
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024 # 1MB maximum file size
-app.secret_key="lighting-project-secret-key"
-# access_token = None
-
+app.secret_key=uuid4().hex
 
 @app.route("/")
 @app.route("/index")
 def index():
-#     print("Getting request")
-#     requests.get(request.base_url)
     if 'access-token' in session:
-        print ("access token found")
+        print("access token found")
+        print("Logged in as", session['username'])
     else:
-        print("not found")
-#     access_token = request.headers.get("access-token")
-#     print(request.headers)
-# #     print(token)
-#     if access_token is not None:
-#         print("access token found")
-#     else:
-#         print('not found')
-#         return redirect(url_for('login'))
-#         print("Access token found")
-#         print(request.headers.get("access-token"))
-#     access = requests.get(request.base_url)
-#     print(access.request.headers)
-#     return redirect(access.url)
+        return (render_template('login.html'))
     
     # Clients to access AWS services
     dynamodb = boto3.resource("dynamodb")
@@ -90,7 +75,7 @@ def index():
             lightsticks.insert(0, state)
 #     print(lightsticks)
     
-    return render_template("index.html", lightsticks=lightsticks, modes=modes, patterns=patterns)
+    return render_template("index.html", username=session['username'],lightsticks=lightsticks, modes=modes, patterns=patterns)
 
 @app.route("/lightstick/<name>/data")
 def get_sensors_data(name):
@@ -155,16 +140,16 @@ def update(name):
 
 @app.route("/login")
 def login():
-#     return render_template("login.html")
-    return "<p>Login page</p>"
+    return render_template("login.html")
+#     return "<p>Login page</p>"
 
-@app.route("/validate")
+@app.route("/validate", methods=["POST"])
 def validate():
-#     username = request.form["username"]
-#     password = request.form["password"]
+    username = request.form["username"]
+    password = request.form["password"]
     
-    username = "admin"
-    password = "lighting-project"
+#     username = "admin"
+#     password = "lighting-project"
     
     client = boto3.client("cognito-idp")
     try:
@@ -178,41 +163,29 @@ def validate():
         )
         
         access_token = response["AuthenticationResult"]["AccessToken"]
-#         res = { "access-token": access_token}
-#         return jsonify(res)
-#         print(url_for('index'))
         session['access-token'] = access_token
-        return redirect(url_for('index'))
-#         response = redirect(url_for('index'))
-#         response.headers = {'access-token':access_token}
-#         return response
-    
-#         res = requests.get('http://0.0.0.0:5000',headers={'access-token':access_token},allow_redirects=False)
-# #         print("redirecting")
-#         return redirect(res.url)
-#         print(request.base_url)
-#         print(url_for('index'))
-    
-    
+        session['username'] = username    
+        
+        res = { "status": 200, "message": url_for('index') }
 ##### Run this if "NEW_PASSWORD_REQUIRED" Challenge Posed #####    
 #         chg = client.respond_to_auth_challenge(
 #             ClientId = CLIENT_ID,
 #             ChallengeName="NEW_PASSWORD_REQUIRED",
 #             ChallengeResponses={
-#                 "USERNAME":"admin",
-#                 "NEW_PASSWORD": "lighting-project"
+#                 "USERNAME":"username",
+#                 "NEW_PASSWORD": "password"
 #             },
 #             Session=response["Session"]            
 #         )
         
     except client.exceptions.NotAuthorizedException as e:
-        print("Incorrect username or password")
-    
+        res = { "status": 422, "message": "Invalid username or password" }
+            
     except Exception as e:
-        print(e)
+        res = { "status": 500, "message": "Something went wrong on the server..." }
         
-    return ("")
-#     print(response)
+    return jsonify(res)
+
             
 @app.route("/lightstick/<name>/upload", methods=["POST"])
 def upload(name):
