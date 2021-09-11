@@ -84,7 +84,6 @@ void loop() {
     }
 
     gyro->getEvent(&event);
-    client.flush();
     client.print(event.gyro.x);
     client.print(",");
     client.print(event.gyro.y);
