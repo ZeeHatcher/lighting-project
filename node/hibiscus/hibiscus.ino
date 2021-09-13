@@ -17,7 +17,7 @@ WiFiClient client;
 
 Adafruit_DotStar strip(NUM_PIXELS, 23, 18, DOTSTAR_BGR);
 Adafruit_MPU6050 mpu;
-Adafruit_Sensor* gyro;
+Adafruit_Sensor* accel;
 
 sensors_event_t event;
 
@@ -57,7 +57,7 @@ void setup() {
     Serial.println("Failed to find Hibiscus Sense MPU6050 chip!");
   }
 
-  gyro = mpu.getGyroSensor();
+  accel = mpu.getAccelerometerSensor();
 
   strip.clear();
   strip.show();
@@ -83,12 +83,12 @@ void loop() {
       strip.show();
     }
 
-    gyro->getEvent(&event);
-    client.print(event.gyro.x);
+    accel->getEvent(&event);
+    client.print(event.acceleration.x);
     client.print(",");
-    client.print(event.gyro.y);
+    client.print(event.acceleration.y);
     client.print(",");
-    client.print(event.gyro.z);
+    client.print(event.acceleration.z);
     client.print("|");
 
     // Limit loop rate to 30 frames per second
