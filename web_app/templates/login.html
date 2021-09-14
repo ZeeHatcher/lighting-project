@@ -20,70 +20,59 @@
   </head>
 
   <body>
-	<!-- <div class="d-flex bg-warning align-items-end align-middle"> -->
-    <div class="d-flex align-items-center justify-content-center fill">
-	<div>
-	    <div class="text-center p-2">
-		<h1>lighting_project</h1>
-	    </div>
-    <!-- </div> -->
-    <!-- <div class="row align-items-center d-flex fill"> -->
-	    <div>
-		<div id="login-section" class="h-auto px-3 py-4 border border-white">
-		    <!-- <h1>lighting_project</h1> -->
-		    <!-- <br> -->
-		    <h2>Sign in</h2>
-		    <form id="login-form" action="" autocomplete="off">
-			<label for="username" class="form-label">Username:</label>
-			<input type="text" id="login-username" name="username" class="form-control text-input bg-transparent border-0 border-bottom text-light" value="">
-			<div id="invalid-input-username" class="invisible input-error mt-1">
-			    <span class="fw-bolder text-danger">Please provide a username</span>
-			</div>
-			<br>
-			<label for="password" class="form-label">Password:</label>
-			<input type="password" class="form-control text-input bg-transparent border-0 border-bottom text-light" id="login-password" name="password" value="">
-			<div id="invalid-input-password" class="invisible input-error mt-1">
-			    <span class="fw-bolder text-danger">Please enter a password</span>
-			</div>
-		    </form>
-		    <br>
-	    <!-- </div> -->
-	    <!-- <div> -->
-		    <div class="d-grid">
-			<button class="btn btn-primary" id="form-btn" value="Submit">Submit</button>
-		    </div>
-		</div>
-	    </div>
-	</div>
+    <div class="d-flex justify-content-around">
+      <div class="content p-4">
+        <header>
+          <h1>lighting_project</h1>
+        </header>
+
+        <main class="d-flex justify-content-center align-items-center" style="height: 90%;">
+          <div id="section-login">
+            <h6 class="text-lit">login</h6>
+
+            <form id="form-login" action="" class="needs-validation" novalidate>
+              <div class="form-row mb-2">
+                <input id="input-username" type="text" class="form-control" name="username" placeholder="username" required>
+                <div class="invalid-feedback">
+                  Please enter a username.
+                </div>
+              </div>
+
+              <div class="form-row mb-4">
+                <input id="input-password" type="password" class="form-control" name="password" placeholder="password" required>
+                <div class="invalid-feedback">
+                  Please enter a password.
+                </div>
+              </div>
+
+              <button class="d-block btn btn-primary m-auto" type="submit">Submit</button>
+            </form>
+          </div>
+        </main>
+      </div>
     </div>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js" integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU=" crossorigin="anonymous"></script>
     <script>
-	function onFormSubmit(){
-	    var fields = ["username","password"];
-	    let isValid = true;
-	    $.each(fields, function(index,key){
-		//alert(key);
-		let value = $("#login-" + key).val();
-		//alert(value);
-		if(value.length === 0){
-		    //alert("Input error");
-		    isValid = false
-		    $("#invalid-input-"+key).removeClass("invisible");
-		    $("#login-"+key).addClass("is-invalid");
-		}else{
-		    //alert("Input success");
-		    $("#invalid-input-"+key).addClass("invisible");
-		    $("#login-"+key).removeClass("is-invalid");
-		}
-	    });
-	    
-	    if(isValid){
-		let username = $("#login-username").val();
-		let password = $("#login-password").val();
-		login(username,password);
-	    }
-	}
+      $(document).ready(function() {
+        var validation = Array.prototype.filter.call($("#form-login"), function(form) {
+          form.addEventListener('submit', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            form.classList.add('was-validated');
+
+            if (form.checkValidity() === true) {
+              let username = $("#input-username").val();
+              let password = $("#input-password").val();
+
+              login(username, password);
+            }
+            
+            return false;
+          }, false);
+        });
 	
 	function login(username,password){
           $.ajax({
@@ -98,8 +87,7 @@
             }
           });
 	}
-	
-	$(document).on("click", "#form-btn", onFormSubmit);
+      });
     </script>
   </body>
 </html>
