@@ -94,6 +94,10 @@ h2, h3, h4, h5, h6 {
   color: #526777;
 }
 
+.btn-text.btn-alert:hover {
+  color: red;
+}
+
 .btn-text.active {
   color: #43ffaf;
 }

@@ -57,6 +57,12 @@
             </div>
             <div class="col-auto">
               <div class="row">
+                <div class="text-end">
+                  <a id="btn-logout" class="btn btn-text btn-alert fs-7 ms-1 text-end">logout</a>
+                </div>
+              </div>
+
+              <div class="row">
                 <div class="col d-flex justify-content-end align-items-center">
                   <span id="switch-label-off" class="fs-7 me-2 switch-label">off</span>
                   <div class="form-switch">
@@ -550,6 +556,19 @@
           });
         }
 
+        function onLogoutClick() {
+          $.ajax({
+            url: "/logout",
+            method: "POST",
+            success: function (res) {
+              window.location = res.redirect;
+            },
+            error: function (err) {
+              alert("Something went wrong on the server...");
+            }
+          });
+        }
+
         // Generate charts
         let chartX = generateChart($("#chart-x"), "x", []);
         let chartY = generateChart($("#chart-y"), "y", []);
@@ -575,6 +594,7 @@
         $(document).on("click", "#close-sidebar", onCloseSidebar);
         $(document).on("click", "#overlay", onCloseSidebar);
         $(document).on("click", ".sidebar-item", onSelectLightstick);
+        $(document).on("click", "#btn-logout", onLogoutClick);
         
         // Set initial website state
         $("#lightstick-name").text(current["name"]);

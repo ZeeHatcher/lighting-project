@@ -86,22 +86,14 @@
 	}
 	
 	function login(username,password){
-	    //alert(username);
-	    //alert(password);
-	    $.ajax({
-            url: `validate`,
+          $.ajax({
+            url: "/login",
             method: "POST",
-            data: {"username": username, "password":password},
-            success: function(res) {
-		if(res["status"] != 200){
-		    alert(res["message"]);
-		}else{
-		    window.location.replace(res["message"]);
-		}
-		console.log(res);
-	    },
+            data: { "username": username, "password": password },
+            success: function (res) {
+              window.location = res.redirect;
+            },
             error: function (err) {
-              console.log(err);
               alert("Something went wrong on the server...");
             }
           });

@@ -2,7 +2,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from contextlib import closing
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, g, url_for, redirect, request,session
+from flask import Flask, render_template, request, jsonify, g, url_for, redirect, request, session
 import json
 import os
 import sys
@@ -21,11 +21,11 @@ app.secret_key=uuid4().hex
 @app.route("/")
 @app.route("/index")
 def index():
-    if 'access-token' in session:
+    if "access-token" in session and session["access-token"]:
         print("access token found")
         print("Logged in as", session['username'])
     else:
-        return (render_template('login.html'))
+        return redirect('/login')
     
     # Clients to access AWS services
     dynamodb = boto3.resource("dynamodb")
@@ -138,35 +138,31 @@ def update(name):
 
     return jsonify(res)
 
-@app.route("/login")
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    return render_template("login.html")
-#     return "<p>Login page</p>"
+    if request.method == "GET":
+        if "access-token" in session and session["access-token"]:
+            return redirect('/')
 
-@app.route("/validate", methods=["POST"])
-def validate():
-    username = request.form["username"]
-    password = request.form["password"]
-    
+        return render_template("login.html")
+
+    elif request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        
 #     username = "admin"
 #     password = "lighting-project"
-    
-    client = boto3.client("cognito-idp")
-    try:
-        response = client.initiate_auth(
-            ClientId = CLIENT_ID,
-            AuthFlow="USER_PASSWORD_AUTH",
-            AuthParameters={
-                "USERNAME": username,
-                "PASSWORD": password,
-            }
-        )
         
-        access_token = response["AuthenticationResult"]["AccessToken"]
-        session['access-token'] = access_token
-        session['username'] = username    
-        
-        res = { "status": 200, "message": url_for('index') }
+        client = boto3.client("cognito-idp")
+        try:
+            response = client.initiate_auth(
+                ClientId = CLIENT_ID,
+                AuthFlow="USER_PASSWORD_AUTH",
+                AuthParameters={
+                    "USERNAME": username,
+                    "PASSWORD": password,
+                }
+            )
 ##### Run this if "NEW_PASSWORD_REQUIRED" Challenge Posed #####    
 #         chg = client.respond_to_auth_challenge(
 #             ClientId = CLIENT_ID,
@@ -177,15 +173,29 @@ def validate():
 #             },
 #             Session=response["Session"]            
 #         )
-        
-    except client.exceptions.NotAuthorizedException as e:
-        res = { "status": 422, "message": "Invalid username or password" }
             
-    except Exception as e:
-        res = { "status": 500, "message": "Something went wrong on the server..." }
-        
-    return jsonify(res)
+        except client.exceptions.NotAuthorizedException as e:
+            abort(422)
+                
+        except Exception as e:
+            abort(400)
 
+        access_token = response["AuthenticationResult"]["AccessToken"]
+        session['access-token'] = access_token
+        session['username'] = username    
+        
+        res = { "status": 200, "message": "Successfully logged in", "redirect": url_for("index") }
+            
+        return jsonify(res)
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session['access-token'] = None
+    session['username'] = None    
+
+    res = { "status": 200, "message": "Successfully logged out", "redirect": url_for("login") }
+
+    return jsonify(res)
             
 @app.route("/lightstick/<name>/upload", methods=["POST"])
 def upload(name):
