@@ -84,11 +84,8 @@ void loop() {
     }
 
     accel->getEvent(&event);
-    client.print(event.acceleration.x);
-    client.print(",");
-    client.print(event.acceleration.y);
-    client.print(",");
-    client.print(event.acceleration.z);
+    double mag = sqrt(pow(event.acceleration.x, 2) + pow(event.acceleration.y, 2) + pow(event.acceleration.z, 2));
+    client.print(mag);
     client.print("|");
 
     // Limit loop rate to 30 frames per second

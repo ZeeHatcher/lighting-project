@@ -347,28 +347,17 @@ class ImageMode(Mode):
 
 class LightsaberMode(Mode):
     def __init__(self):
-        self._values = None
+        self._value = 0
         # self._thread = None
         # self.v = Value("I", 0)
 
     def run(self):
-        # if ser != None:
-            # value = ser.read_until().strip()
-            # self.v.value = int(value) if value else 0
-
         # if self._thread == None:
             # print("Starting publish thread...")
             # self._thread = threading.Thread(target=publish_sensors_data, args=(self.v,))
             # self._thread.start()
 
-        # weight = round(self.v.value / 1023 * 255)
-
-        if self._values == None or len(self._values) < 3:
-            c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
-        else:
-            c_r = bytearray([self._colorify(self._values[0])] * NUM_PIXELS)
-            c_g = bytearray([self._colorify(self._values[1])] * NUM_PIXELS)
-            c_b = bytearray([self._colorify(self._values[2])] * NUM_PIXELS)
+        c_r = c_g = c_b = bytearray([self._colorify(self._value)] * NUM_PIXELS)
 
         return c_r, c_g, c_b
     
@@ -383,15 +372,15 @@ class LightsaberMode(Mode):
             # self._thread = None
 
     def _colorify(self, x):
-        return round(min(abs(x) / 4, 1) * 255)
+        return round(min(abs(x) * 0.05, 1) * 255)
 
     @property
-    def values(self):
-        return self._values
+    def value(self):
+        return self._value
 
-    @values.setter
-    def values(self, values):
-        self._values = values
+    @value.setter
+    def value(self, value):
+        self._value = value
 
 class Pattern(ABC):
     @abstractmethod
@@ -728,10 +717,12 @@ def change_shadow_state():
     future = shadow_client.publish_update_shadow(request, mqtt.QoS.AT_LEAST_ONCE)
     future.add_done_callback(on_publish_update_shadow)
 
-first = True
+
+
+buf = ""
+
 def loop():
-    global mode_id, mode
-    global first
+    global mode_id, mode, buf
 
     is_on = locked_data.shadow_state["is_on"]
     new_mode_id = locked_data.shadow_state["mode"] if is_on else 0
@@ -767,6 +758,7 @@ def loop():
         if s is server_socket: # New client is attempting connection to server
             print("New client detected.")
             client_socket, address = server_socket.accept()
+            client_socket.setblocking(False)
             sockets.append(client_socket)
 
         else: # Client has sent data
@@ -782,10 +774,13 @@ def loop():
                     sockets.remove(s)
                     print("Closed.")
 
-            else:
-                if data:
-                    print(data)
+                    break
 
+            else:
+                if data and mode_id == 5:
+                    buf += data.decode()
+                    print(buf)
+                        
                 else:
                     print("Received 0 bytes. Connection to client is closed.")
 
@@ -794,6 +789,8 @@ def loop():
                         s.close()
                         sockets.remove(s)
                         print("Closed.")
+
+                    break
 
     for s in writable:
         try:
@@ -818,6 +815,25 @@ def loop():
             sockets.remove(s)
             s.close()
             print("Closed.")
+
+    # Get latest value from incoming byte stream
+    if mode_id == 5:
+        val = None
+
+        while True:
+            i_delimiter = buf.find("|")
+
+            if i_delimiter == -1:
+                print("break")
+                break
+
+            val = buf[:i_delimiter]
+            buf = buf[i_delimiter+1:]
+
+        if val != None:
+            mode.value = float(val)
+        else:
+            mode.value = 0
 
     # Virtual output
     if lightstick != None:
