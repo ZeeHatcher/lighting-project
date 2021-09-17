@@ -38,6 +38,9 @@ import select
 import socket
 from virtual import VirtualLightstick
 
+#lightsaber mode
+from mutagen.mp3 import MP3
+
 load_dotenv()
 
 NUM_PIXELS = int(os.environ.get("NUM_PIXELS"))
@@ -343,33 +346,106 @@ class ImageMode(Mode):
         return c_r, c_g, c_b
 
     def exit(self):
+        pygame.quit()
         pass
 
 class LightsaberMode(Mode):
     def __init__(self):
-        self._value = 0
-        # self._thread = None
-        # self.v = Value("I", 0)
+        self._phase = 0
+        self._pixels = 0
+#         self._value_file = open("values.txt","r")
+#         self._values = self._value_file.read().split("|")
+#         self._tracker = 0
+#         self._stime = 0
+        self._last_val = 0
+        self._consequtive_val = 0
+        pygame.mixer.init()
+        pygame.mixer.set_num_channels(4)
+        
+        direct = "/home/pi/Documents/lighting-project/edge/saber-sounds/"
+        self._start_sound = direct+ "saber-on.wav"
+        self._idle_sound = direct + "saber-idle.wav"
+        self._clash_sound = direct + "saber-clash1.wav"
+        self._swing_sound = direct + "saber-swing.wav"
+        
 
     def run(self):
-        # if self._thread == None:
-            # print("Starting publish thread...")
-            # self._thread = threading.Thread(target=publish_sensors_data, args=(self.v,))
-            # self._thread.start()
+              
+        c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+        colors = locked_data.shadow_state["colors"]
 
-        c_r = c_g = c_b = bytearray([self._colorify(self._value)] * NUM_PIXELS)
-
+        if(self._phase == 1):
+            self.pixels = NUM_PIXELS
+#             value = float(self._values[self._tracker])
+#             if(self._tracker < len(self._values)-1):
+#                 self._tracker += 1
+#             else:
+#                 self._tracker = 0
+                
+#             print (value)
+            
+            channel = pygame.mixer.Channel(1)
+            swing_sound = pygame.mixer.Sound(self._swing_sound)
+            clash_sound = pygame.mixer.Sound(self._clash_sound)
+#             if (self._last_val < value):
+            if channel.get_busy():
+                pass
+            else:
+                if(self._value>16):
+                    channel.play(clash_sound)
+                    colors = ['ffffff']
+                elif(self._value>11):
+                    if(self._consequtive_val == 0):
+                        channel.play(swing_sound)
+                        
+                    if(self._consequtive_val >= 5):
+                        channel.play(swing_sound)
+                        self._consequtive_val = 0
+                else:
+                    pass
+                      
+            if(self._value>0.0 and abs(self._value-self._last_val)<=3):
+                self._consequtive_val += 1
+            else:
+                self._consequtive_val = 0
+                
+#             print("Consequtive:",self._consequtive_val)
+            self._last_val = self._value
+    
+        if(self._phase == 0):
+            song_length = librosa.get_duration(filename=self._start_sound) * 1000
+            if pygame.mixer.music.get_busy():
+                self._pixels = int((pygame.mixer.music.get_pos()/song_length)*NUM_PIXELS)
+                
+                if (pygame.mixer.music.get_pos() > int(song_length*0.95)):
+                    channel = pygame.mixer.Channel(0)
+                    sound = pygame.mixer.Sound(self._idle_sound)
+                    channel.play(sound,loops = -1)
+            else:
+                if(self._pixels == 0):
+                    pygame.mixer.music.load(self._start_sound)
+                    pygame.mixer.music.play()
+#                     self._stime = time.time()
+                else:
+#                     idle = pygame.mixer.music.load(direct+ "saber-idle.wav")
+#                     pygame.mixer.music.play(loops=-1)
+                    self.pixels = NUM_PIXELS
+                    self._phase = 1
+                    
+#         print(pygame.mixer.music.get_pos())        
+        if(self._pixels >= NUM_PIXELS):
+            self._pixels = NUM_PIXELS
+                
+        
+        color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
+        c_r[0:self._pixels] = bytearray([color.r] * self._pixels)
+        c_g[0:self._pixels] = bytearray([color.g] * self._pixels)
+        c_b[0:self._pixels] = bytearray([color.b] * self._pixels)      
         return c_r, c_g, c_b
     
     def exit(self):
+#         self._value_file.close()
         pass
-        # if self._thread != None:
-            # print("Stopping publish thread...")
-
-            # self._thread.is_run = False
-            # self._thread.join()
-
-            # self._thread = None
 
     def _colorify(self, x):
         return round(min(abs(x) * 0.05, 1) * 255)
@@ -824,16 +900,21 @@ def loop():
             i_delimiter = buf.find("|")
 
             if i_delimiter == -1:
-                print("break")
+#                 print("break")
                 break
+
 
             val = buf[:i_delimiter]
             buf = buf[i_delimiter+1:]
+            
 
         if val != None:
             mode.value = float(val)
+#             f.write(str(float(val)))
         else:
             mode.value = 0
+        
+#         f.write("|")
 
     # Virtual output
     if lightstick != None:
@@ -852,6 +933,7 @@ if __name__ == "__main__":
     server_socket.bind(("", 12345))
     server_socket.listen(1)
     print("Initialized.")
+#     f = open("values.txt","a")
 
     sockets = [server_socket]
 
@@ -947,6 +1029,7 @@ if __name__ == "__main__":
             loop()
 
     except KeyboardInterrupt:
+#         f.close()
         exit("Caught KeyboardInterrupt, terminating connections")
 
     except Exception as e:
