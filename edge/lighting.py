@@ -40,6 +40,7 @@ from virtual import VirtualLightstick
 
 #lightsaber mode
 from mutagen.mp3 import MP3
+import random
 
 load_dotenv()
 
@@ -362,16 +363,19 @@ class LightsaberMode(Mode):
         pygame.mixer.init()
         pygame.mixer.set_num_channels(4)
         
-        direct = "/home/pi/Documents/lighting-project/edge/saber-sounds/"
-        self._start_sound = direct+ "saber-on.wav"
-        self._idle_sound = direct + "saber-idle.wav"
-        self._clash_sound = direct + "saber-clash1.wav"
-        self._swing_sound = direct + "saber-swing.wav"
+        self._direct = "/home/pi/Documents/lighting-project/edge/saber-sounds/"
+        self._start_sound = self._direct+ "saber-on.wav"
+        self._idle_sound = self._direct + "saber-idle.wav"
+        self._clash_sounds = ["saber-clash1.wav","saber-clash2.wav","saber-clash3.wav","saber-clash4.wav"]
+        self._swing_sound = self._direct + "saber-swing.wav"
         
 
     def run(self):
               
-        c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+#         c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+        c_r = bytearray([0] * NUM_PIXELS)
+        c_g = bytearray([0] * NUM_PIXELS)
+        c_b = bytearray([0] * NUM_PIXELS)
         colors = locked_data.shadow_state["colors"]
 
         if(self._phase == 1):
@@ -386,7 +390,7 @@ class LightsaberMode(Mode):
             
             channel = pygame.mixer.Channel(1)
             swing_sound = pygame.mixer.Sound(self._swing_sound)
-            clash_sound = pygame.mixer.Sound(self._clash_sound)
+            clash_sound = pygame.mixer.Sound(self._direct + random.choice(self._clash_sounds))
 #             if (self._last_val < value):
             if channel.get_busy():
                 pass
@@ -436,11 +440,13 @@ class LightsaberMode(Mode):
         if(self._pixels >= NUM_PIXELS):
             self._pixels = NUM_PIXELS
                 
-        
         color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
         c_r[0:self._pixels] = bytearray([color.r] * self._pixels)
         c_g[0:self._pixels] = bytearray([color.g] * self._pixels)
-        c_b[0:self._pixels] = bytearray([color.b] * self._pixels)      
+        c_b[0:self._pixels] = bytearray([color.b] * self._pixels)
+        
+        # Limit to 30 frames per second
+        time.sleep(0.034)
         return c_r, c_g, c_b
     
     def exit(self):
@@ -919,9 +925,6 @@ def loop():
     # Virtual output
     if lightstick != None:
         lightstick.update(c_r, c_g, c_b)
-
-    # Limit to 30 frames per second
-    time.sleep(0.034)
 
 
 
