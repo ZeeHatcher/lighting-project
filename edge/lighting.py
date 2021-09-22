@@ -106,6 +106,8 @@ class MusicMode(Mode):
 #     https://stackoverflow.com/questions/19529230/mp3-with-pyaudio?rq=1
     def __init__(self):
         #/home/pi/Music/ftc2.ogg or audio
+        # Don't add songs with any extension
+        #The conversion will cause it to break T-T
         filename = r"audio"
         try:
             self._wf = wave.open(filename,'rb')
@@ -114,88 +116,99 @@ class MusicMode(Mode):
             new_file = AudioSegment.from_mp3(filename)
             new_file.export(filename,format="wav")
             self._wf = wave.open(filename,'rb')
-
-        #Spits out tons of errors
-        #AudioPort emulating errors (not our concern)
-        self._p = pyaudio.PyAudio()
+            
+        self._data = self._wf.readframes(self._wf.getnframes())
         
-        self._format = self._p.get_format_from_width(self._wf.getsampwidth())
-        self._channels = self._wf.getnchannels()
+#         self._pixels = 0
+        self._previous = 0
+
+        pygame.init()
         self._rate = self._wf.getframerate()
         
-        if self._rate <=16000:
-            self._chunk = 1024
-        else:
-            self._chunk = 4096
+        self._frames_per_sec = int(len(self._data)/(self._wf.getnframes()/self._rate))
 
         #32767(max data for 16bit integer 2^15 -1)
-        self._max = int(32767 * 1.1)
+        self._max = int(32767 * 1.05)
         self._lastHeartBeat = time.time()
         self._increaseHeartBeat = True
-        self._start = 0
 
         array1 = get_gradient_3d(NUM_PIXELS,1,(252,92,125),(106,130,251),(True,True,True))
         self._r = [int(val[0]) for val in array1[0]] #+ [int(val[0]) for val in array2[0]]
         self._g = [int(val[1]) for val in array1[0]] #+ [int(val[1]) for val in array2[0]]
         self._b = [int(val[2]) for val in array1[0]] #+ [int(val[2]) for val in array2[0]]
+
+        #quit to reset the initial
+        pygame.mixer.quit()
+        pygame.mixer.init(frequency=self._rate)
+        pygame.mixer.music.load(filename)
+        pygame.mixer.music.play()
         
-        self._stream = self._p.open(format = self._format,
-                              channels = self._channels,
-                              rate = self._rate,
-                              output = True,
-                              frames_per_buffer = self._chunk
-                              )
     
     def run(self):
-#         colors = locked_data.shadow_state["colors"]
-#         color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
         c_r = bytearray([0] * NUM_PIXELS)
         c_g = bytearray([0] * NUM_PIXELS)
         c_b = bytearray([0] * NUM_PIXELS)
- 
-        data = self._wf.readframes(self._chunk)
-        sound = 0
-        silence = chr(0)*self._chunk*self._channels*2
-        if len(data) >0:        
-#             if(data == ''):
-#                 data = self._silence
-            self._stream.write(data)
-            reading = audioop.max(data,2)
-            sound += reading
-            percentage = int(sound/self._max * NUM_PIXELS)
-            
-            #Prevent statis on the music bar
-            minimum = int(0.05 * NUM_PIXELS)
-            if(time.time() - self._lastHeartBeat > 0.1 and percentage >0):
-#                 print("Sending heartbeat")
-                if(percentage < minimum):
-                    self._increaseHeartBeat = True
-                if(percentage > (NUM_PIXELS - minimum)):
-                    self._increaseHeartBeat = False
-                    
-                if(self._increaseHeartBeat):
-                    percentage += minimum
-                    self._increaseHeartBeat = False
+        
+        
+        if pygame.mixer.music.get_busy():
+            sound = 0
+            place = int(pygame.mixer.music.get_pos()/1000*self._frames_per_sec)
+            try:
+                data = self._data[place:place+2048]
+                if(len(data)>1):
+                    reading = audioop.max(data,2)
                 else:
-                    percentage -= minimum
-                    self._increaseHeartBeat = True
-                self._lastHeartBeat = time.time()
-    
-            c_r[0:percentage] = bytearray(self._r[0:percentage])
-            c_g[0:percentage] = bytearray(self._g[0:percentage])
-            c_b[0:percentage] = bytearray(self._b[0:percentage])
+                    reading = self._previous
+                
+                if(self._previous is 0):
+                    self._previous = reading
+                else:
+                    if(reading >= 32760 or abs(self._previous-reading)>20000):
+                        reading = self._previous
+                    else:
+                        self._previous = reading
+                        
+                sound += reading
+#                 print(reading)
+                percentage = int(sound/self._max * NUM_PIXELS)
+                
+#                 if(self._pixels < percentage):
+#                     self._pixels += 1
+#                 
+#                 if(self._pixels > percentage):
+#                     self._pixels -= 1
+#                 
+#                 percentage = self._pixels
+                    
+                minimum = int(0.05 * NUM_PIXELS)
+                if(time.time() - self._lastHeartBeat > 0.1 and percentage >0):
+        #                 print("Sending heartbeat")
+                    if(percentage < minimum):
+                        self._increaseHeartBeat = True
+                    if(percentage > (NUM_PIXELS - minimum)):
+                        self._increaseHeartBeat = False
+                        
+                    if(self._increaseHeartBeat):
+                        percentage += minimum
+                        self._increaseHeartBeat = False
+                    else:
+                        percentage -= minimum
+                        self._increaseHeartBeat = True
+                    self._lastHeartBeat = time.time()
+            except:
+                percentage = 0
+        else:
+            percentage = 0
+        c_r[0:percentage] = bytearray(self._r[0:percentage])
+        c_g[0:percentage] = bytearray(self._g[0:percentage])
+        c_b[0:percentage] = bytearray(self._b[0:percentage])
                 
         return c_r,c_g,c_b
     
     def exit(self):
-#         pass
-        self._stream.stop_stream()
-        self._stream.close()
-        print("Closed stream")
         self._wf.close()
         print("Closed wave")
-        self._p.terminate()
-        print("PyAudio Terminated")
+        pygame.quit()
 
 class AudioMode(Mode):
     def __init__(self):
