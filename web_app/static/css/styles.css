@@ -7,7 +7,7 @@ body {
   background-color: #262a33;
   color: #e5f7ef;
   cursor: default;
-  overflow: hidden;
+  height: 100vh;
 }
 
 h1{
@@ -16,10 +16,6 @@ h1{
 
 h2, h3, h4, h5, h6 {
   color: #526777;
-}
-
-.coloured{
-  color:white;
 }
 
 #panels > div {
@@ -95,6 +91,10 @@ h2, h3, h4, h5, h6 {
   color: #526777;
 }
 
+.btn-text.btn-alert:hover {
+  color: red;
+}
+
 .btn-text.active {
   color: #43ffaf;
 }
@@ -127,6 +127,18 @@ h2, h3, h4, h5, h6 {
   border-color: transparent;
 }
 
+.form-control {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #e5f7ef;
+  border: none;
+}
+
+.form-control:focus {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #e5f7ef;
+  box-shadow: none;
+}
+
 .form-switch .form-check-input, .form-switch .form-check-input:focus, .form-switch .form-check-input:checked {
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28229, 247, 239, 1%29'/%3e%3c/svg%3e");
 }
@@ -139,8 +151,12 @@ h2, h3, h4, h5, h6 {
   font-size: 0.8em;
 }
 
-.fs-9{
+.fs-9 {
   font-size: 1em;
+}
+
+.max-width {
+  width: 100%;
 }
 
 .icon {
@@ -188,7 +204,16 @@ h2, h3, h4, h5, h6 {
   color: #526777!important;
 }
 
+.text-lit {
+  color: #e5f7ef;
+}
+
 #preview-image{
   max-width: 50vw;
   max-height: 37vh;
+}
+
+#section-login {
+  max-width: 250px;
+  width: 100%;
 }
