@@ -376,7 +376,7 @@ class LightsaberMode(Mode):
         c_r = bytearray([0] * NUM_PIXELS)
         c_g = bytearray([0] * NUM_PIXELS)
         c_b = bytearray([0] * NUM_PIXELS)
-        colors = locked_data.shadow_state["colors"]
+        colors = ['0000ff']
 
         if(self._phase == 1):
             self.pixels = NUM_PIXELS
@@ -388,34 +388,42 @@ class LightsaberMode(Mode):
                 
 #             print (value)
             
-            channel = pygame.mixer.Channel(1)
+            clash_channel = pygame.mixer.Channel(1)
+            swing_channel = pygame.mixer.Channel(2)
             swing_sound = pygame.mixer.Sound(self._swing_sound)
             clash_sound = pygame.mixer.Sound(self._direct + random.choice(self._clash_sounds))
 #             if (self._last_val < value):
-            if channel.get_busy():
-                pass
-            else:
-                if(self._value>16):
-                    channel.play(clash_sound)
-                    colors = ['ffffff']
-                elif(self._value>11):
-                    if(self._consequtive_val == 0):
-                        channel.play(swing_sound)
-                        
-                    if(self._consequtive_val >= 5):
-                        channel.play(swing_sound)
-                        self._consequtive_val = 0
-                else:
+#             if channel.get_busy():
+#                 pass
+#             else:
+            if(self._value>21):
+                if(clash_channel.get_busy()):
                     pass
-                      
-            if(self._value>0.0 and abs(self._value-self._last_val)<=3):
-                self._consequtive_val += 1
+                else:
+                    clash_channel.play(clash_sound)
+                    colors = ['ffffff']
+            elif(self._value>11):
+                if(clash_channel.get_busy() or swing_channel.get_busy()):
+                    pass
+                else:
+                    if(self._consequtive_val == 0):
+                        swing_channel.play(swing_sound)
+                        
+                    if(self._consequtive_val >= 3):
+                        swing_channel.play(swing_sound)
+                        self._consequtive_val = 0
+                    
+                    if(self._value>0.0 and abs(self._value-self._last_val)<=3):
+                        self._consequtive_val += 1
+                    else:
+                        self._consequtive_val = 0
+                        
+        #             print("Consequtive:",self._consequtive_val)
+                    self._last_val = self._value
             else:
-                self._consequtive_val = 0
-                
-#             print("Consequtive:",self._consequtive_val)
-            self._last_val = self._value
-    
+                pass
+                      
+            
         if(self._phase == 0):
             song_length = librosa.get_duration(filename=self._start_sound) * 1000
             if pygame.mixer.music.get_busy():
