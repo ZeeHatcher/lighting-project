@@ -80,7 +80,6 @@
 
               <div class="row">
                 <nav id="modes" class="col d-flex justify-content-end flex-wrap">
-                  <a class="cursor-pointer fs-7 me-1"><i class="bi bi-info icon"></i></a>
                   {% for id, mode in modes.items() %}
                   <a class="btn btn-text fs-7 ms-1" data-value={{ id }} style="display: none">{{ mode.name }}</a>
                   {% endfor %}
@@ -92,15 +91,15 @@
 
         <main>
           <div id="info" style="display: none;">
-            <section>
+            <section class="my-4">
               <h2 id="main-header mb-4">about</h2>
 
-              <p class="my-4">
+              <p>
               The lighting_project is an IoT contraption that is designed to show off the core components of IoT. It features a smart light stick that can be connected to the Internet and is controllable remotely, allowing users to change its behaviour to show different light patterns, as well as make use of different inputs to generate interesting patterns.
               </p>
             </section>
 
-            <section>
+            <section class="my-4">
               <h2 id="main-header mb-4">how it works</h2>
 
               <figure class="figure text-center mb-4">
@@ -141,6 +140,16 @@
                   <button id="btn-submit-color" class="btn btn-primary">submit</button>
                 </div>
               </div>
+
+              <div class="my-4">
+                <h6 class="m-0">expected output</h6>
+                <p>
+                depending on the pattern chosen, the light stick output should look something like the following:
+                </p>
+                <div class="text-center">
+                  <img>
+                </div>
+              </div>
             </div>
 
             <div id="panel-image">
@@ -171,6 +180,13 @@
                       </div>-->
 
               </div>
+
+              <div class="my-4">
+                <h6 class="m-0">expected output</h6>
+                <p>
+                the light stick should look like it is flashing rapidly, as it loops through each row of the image.
+                </p>
+              </div>
             </div>
 
             <div id="panel-audio">
@@ -190,10 +206,24 @@
                   <span id="upload-status-audio" class="mx-1 align-middle fw-bolder"></span>
                 </div>
               </div>
+
+              <div class="my-4">
+                <h6 class="m-0">expected output</h6>
+                <p>
+                the light stick should react accordingly to the audio being played, like a music visualizer.
+                </p>
+              </div>
             </div>
 
             <div id="panel-microphone">
               <h2 id="main-header mb-4">microphone</h2>
+
+              <div class="my-4">
+                <h6 class="m-0">expected output</h6>
+                <p>
+                the light stick should react accordingly to your voice input.
+                </p>
+              </div>
             </div>
 
             <div id="panel-lightsaber">
@@ -213,6 +243,13 @@
                     <canvas id="chart-y"></canvas>
                   </div>
                 </div>
+              </div>
+
+              <div class="my-4">
+                <h6 class="m-0">expected output</h6>
+                <p>
+                try swinging it around, and be one with the force. you should hear humming sounds as you swing, and clashing sounds when you apply abrupt force.
+                </p>
               </div>
             </div>
           </div>
