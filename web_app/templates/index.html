@@ -80,7 +80,7 @@
 
               <div class="row">
                 <nav id="modes" class="col d-flex justify-content-end flex-wrap">
-                  <a class="cursor-pointer fs-7 me-1"><i class="bi bi-info-circle icon"></i></a>
+                  <a class="cursor-pointer fs-7 me-1"><i class="bi bi-info icon"></i></a>
                   {% for id, mode in modes.items() %}
                   <a class="btn btn-text fs-7 ms-1" data-value={{ id }} style="display: none">{{ mode.name }}</a>
                   {% endfor %}
@@ -92,8 +92,26 @@
 
         <main>
           <div id="info" style="display: none;">
-            <h2 id="main-header mb-4">about</h2>
-            <h2 id="main-header mb-4">how it works</h2>
+            <section>
+              <h2 id="main-header mb-4">about</h2>
+
+              <p class="my-4">
+              The lighting_project is an IoT contraption that is designed to show off the core components of IoT. It features a smart light stick that can be connected to the Internet and is controllable remotely, allowing users to change its behaviour to show different light patterns, as well as make use of different inputs to generate interesting patterns.
+              </p>
+            </section>
+
+            <section>
+              <h2 id="main-header mb-4">how it works</h2>
+
+              <figure class="figure text-center mb-4">
+                <img class="figure-img img-fluid" src="{{ url_for('static', filename='img/system_structure.png') }}">
+                <figcaption class="figure-caption">High-level architectural diagram</figcaption>
+              </figure>
+
+              <p class="mb-4">
+              Lorem...
+              </p>
+            </section>
           </div>
 
           <div id="panels" style="display: none;">
