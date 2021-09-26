@@ -132,11 +132,13 @@ class MusicMode(Mode):
         self._lastHeartBeat = time.time()
         self._increaseHeartBeat = True
 
-        array1 = get_gradient_3d(NUM_PIXELS,1,(252,92,125),(106,130,251),(True,True,True))
-        self._r = [int(val[0]) for val in array1[0]] #+ [int(val[0]) for val in array2[0]]
-        self._g = [int(val[1]) for val in array1[0]] #+ [int(val[1]) for val in array2[0]]
-        self._b = [int(val[2]) for val in array1[0]] #+ [int(val[2]) for val in array2[0]]
-
+        half_pixels = int(NUM_PIXELS/2)
+        array1 = get_gradient_3d(half_pixels,1,(30,150,0),(255,242,0),(True,True,True))
+        array2 = get_gradient_3d((NUM_PIXELS - half_pixels),1,(255,242,0),(255,0,0),(True,True,True))
+        self._r = [int(val[0]) for val in array1[0]] + [int(val[0]) for val in array2[0]]
+        self._g = [int(val[1]) for val in array1[0]] + [int(val[1]) for val in array2[0]]
+        self._b = [int(val[2]) for val in array1[0]] + [int(val[2]) for val in array2[0]]
+        
         #quit to reset the initial
         pygame.mixer.quit()
         pygame.mixer.init(frequency=self._rate)
