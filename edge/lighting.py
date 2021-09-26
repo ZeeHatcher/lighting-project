@@ -38,6 +38,11 @@ import select
 import socket
 from virtual import VirtualLightstick
 
+#lightsaber mode
+from mutagen.mp3 import MP3
+import librosa
+import random
+
 load_dotenv()
 
 NUM_PIXELS = int(os.environ.get("NUM_PIXELS"))
@@ -369,39 +374,127 @@ class ImageMode(Mode):
         return c_r, c_g, c_b
 
     def exit(self):
+        pygame.quit()
         pass
 
 class LightsaberMode(Mode):
     def __init__(self):
+        self._value = Value("f", 0)
         self._thread = None
-        self.v = Value("I", 0)
-        #1 = red, 2 = green, 3 = blue
-        self._type = "blue"
-        #0 = off, 1 = on, 2 = idle
-        self._phase = 1
+        self._phase = 0
         self._pixels = 0
-        pygame.init()
+#         self._value_file = open("values.txt","r")
+#         self._values = self._value_file.read().split("|")
+#         self._tracker = 0
+#         self._stime = 0
+        self._last_val = 0
+        self._consequtive_val = 0
+        pygame.mixer.init()
+        pygame.mixer.set_num_channels(4)
         
-#         locked_data.shadow_state["pattern"]
+        self._direct = "./saber-sounds/"
+        self._start_sound = self._direct+ "saber-on.wav"
+        self._idle_sound = self._direct + "saber-idle.wav"
+        self._clash_sounds = ["saber-clash1.wav","saber-clash2.wav","saber-clash3.wav","saber-clash4.wav"]
+        self._swing_sound = self._direct + "saber-swing.wav"
+        
 
     def run(self):
-        if ser != None:
-            value = ser.read_until().strip()
-            self.v.value = int(value) if value else 0
+        val = self._value.value
+              
+#         c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+        c_r = bytearray([0] * NUM_PIXELS)
+        c_g = bytearray([0] * NUM_PIXELS)
+        c_b = bytearray([0] * NUM_PIXELS)
+        colors = ['0000ff']
 
         if self._thread == None:
             print("Starting publish thread... ", end="")
-            self._thread = threading.Thread(target=publish_sensors_data, args=(self.v,))
+            self._thread = threading.Thread(target=publish_sensors_data, args=(self._value,))
             self._thread.start()
             print("Started.")
 
-        weight = round(self.v.value / 1023 * 255)
-
-        c_r = c_g = c_b = bytearray([weight] * NUM_PIXELS)
-
+        if(self._phase == 1):
+            self.pixels = NUM_PIXELS
+#             value = float(self._values[self._tracker])
+#             if(self._tracker < len(self._values)-1):
+#                 self._tracker += 1
+#             else:
+#                 self._tracker = 0
+                
+#             print (value)
+            
+            clash_channel = pygame.mixer.Channel(1)
+            swing_channel = pygame.mixer.Channel(2)
+            swing_sound = pygame.mixer.Sound(self._swing_sound)
+            clash_sound = pygame.mixer.Sound(self._direct + random.choice(self._clash_sounds))
+#             if (self._last_val < value):
+#             if channel.get_busy():
+#                 pass
+#             else:
+            if(val > 21):
+                if(clash_channel.get_busy()):
+                    pass
+                else:
+                    clash_channel.play(clash_sound)
+                    colors = ['ffffff']
+            elif(val > 11):
+                if(clash_channel.get_busy() or swing_channel.get_busy()):
+                    pass
+                else:
+                    if(self._consequtive_val == 0):
+                        swing_channel.play(swing_sound)
+                        
+                    if(self._consequtive_val >= 3):
+                        swing_channel.play(swing_sound)
+                        self._consequtive_val = 0
+                    
+                    if(val >0.0 and abs(val - self._last_val)<=3):
+                        self._consequtive_val += 1
+                    else:
+                        self._consequtive_val = 0
+                        
+        #             print("Consequtive:",self._consequtive_val)
+                    self._last_val = val
+            else:
+                pass
+                      
+            
+        if(self._phase == 0):
+            song_length = librosa.get_duration(filename=self._start_sound) * 1000
+            if pygame.mixer.music.get_busy():
+                self._pixels = int((pygame.mixer.music.get_pos()/song_length)*NUM_PIXELS)
+                
+                if (pygame.mixer.music.get_pos() > int(song_length*0.95)):
+                    channel = pygame.mixer.Channel(0)
+                    sound = pygame.mixer.Sound(self._idle_sound)
+                    channel.play(sound,loops = -1)
+            else:
+                if(self._pixels == 0):
+                    pygame.mixer.music.load(self._start_sound)
+                    pygame.mixer.music.play()
+#                     self._stime = time.time()
+                else:
+#                     idle = pygame.mixer.music.load(direct+ "saber-idle.wav")
+#                     pygame.mixer.music.play(loops=-1)
+                    self.pixels = NUM_PIXELS
+                    self._phase = 1
+                    
+#         print(pygame.mixer.music.get_pos())        
+        if(self._pixels >= NUM_PIXELS):
+            self._pixels = NUM_PIXELS
+                
+        color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
+        c_r[0:self._pixels] = bytearray([color.r] * self._pixels)
+        c_g[0:self._pixels] = bytearray([color.g] * self._pixels)
+        c_b[0:self._pixels] = bytearray([color.b] * self._pixels)
+        
+        # Limit to 30 frames per second
+        time.sleep(0.034)
         return c_r, c_g, c_b
     
     def exit(self):
+#         self._value_file.close()
         if self._thread != None:
             print("Stopping publish thread... ", end="")
 
@@ -409,7 +502,15 @@ class LightsaberMode(Mode):
             self._thread.join()
 
             self._thread = None
-            print("Stopped.")
+            print("Stopped publish thread.")
+
+    @property
+    def value(self):
+        return self._value.value
+
+    @value.setter
+    def value(self, value):
+        self._value.value = value
 
 class Pattern(ABC):
     @abstractmethod
@@ -715,18 +816,16 @@ def publish_sensors_data(v):
     while getattr(t, "is_run", True):
         topic = "lightstick/" + THING_NAME + "/data"
         payload = {
-            "x": v.value,
-            "y": 1 / v.value if v.value > 0 else 1
+            "acceleration": v.value,
+            "is_clash": v.value > 21
         }
-
-        print(topic, payload)
 
         mqtt_connection.publish(
             topic=topic,
             payload=json.dumps(payload),
             qos=mqtt.QoS.AT_LEAST_ONCE)
 
-        time.sleep(5)
+        time.sleep(1)
 
     print("Stopped publish thread.")
 
@@ -750,8 +849,12 @@ def change_shadow_state():
     future = shadow_client.publish_update_shadow(request, mqtt.QoS.AT_LEAST_ONCE)
     future.add_done_callback(on_publish_update_shadow)
 
+
+
+buf = ""
+
 def loop():
-    global mode_id, mode
+    global mode_id, mode, buf
 
     is_on = locked_data.shadow_state["is_on"]
     new_mode_id = locked_data.shadow_state["mode"] if is_on else 0
@@ -778,6 +881,8 @@ def loop():
 
     c_r, c_g, c_b = mode.run()
 
+    # mode.values = tuple(map(lambda v: float(v), l.split(",")))
+
     # Wireless output
     readable, writable, exceptional = select.select(sockets, sockets, sockets)
 
@@ -785,6 +890,7 @@ def loop():
         if s is server_socket: # New client is attempting connection to server
             print("New client detected.")
             client_socket, address = server_socket.accept()
+            client_socket.setblocking(False)
             sockets.append(client_socket)
 
         else: # Client has sent data
@@ -800,10 +906,14 @@ def loop():
                     sockets.remove(s)
                     print("Closed.")
 
+                    break
+
             else:
                 if data:
-                    print(data)
-
+                    if mode_id == 5:
+                        buf += data.decode()
+                        print(buf)
+                        
                 else:
                     print("Received 0 bytes. Connection to client is closed.")
 
@@ -812,6 +922,8 @@ def loop():
                         s.close()
                         sockets.remove(s)
                         print("Closed.")
+
+                    break
 
     for s in writable:
         try:
@@ -837,6 +949,30 @@ def loop():
             s.close()
             print("Closed.")
 
+    # Get latest value from incoming byte stream
+    if mode_id == 5:
+        val = None
+
+        while True:
+            i_delimiter = buf.find("|")
+
+            if i_delimiter == -1:
+#                 print("break")
+                break
+
+
+            val = buf[:i_delimiter]
+            buf = buf[i_delimiter+1:]
+            
+
+        if val != None:
+            mode.value = float(val)
+#             f.write(str(float(val)))
+        else:
+            mode.value = 0
+        
+#         f.write("|")
+
     # Virtual output
     if lightstick != None:
         lightstick.update(c_r, c_g, c_b)
@@ -854,6 +990,7 @@ if __name__ == "__main__":
     server_socket.bind(("", 12345))
     server_socket.listen(1)
     print("Initialized.")
+#     f = open("values.txt","a")
 
     sockets = [server_socket]
 
@@ -949,6 +1086,7 @@ if __name__ == "__main__":
             loop()
 
     except KeyboardInterrupt:
+#         f.close()
         exit("Caught KeyboardInterrupt, terminating connections")
 
     except Exception as e:

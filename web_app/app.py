@@ -83,25 +83,29 @@ def get_sensors_data(name):
     table = dynamodb.Table("sensors_data")
 
     response = table.query(
-        KeyConditionExpression=Key("thing_name").eq(name))
+        KeyConditionExpression=Key("thing_name").eq(name),
+        ScanIndexForward=False,
+        Limit=25)
 
-    x = []
-    y = []
+    acceleration = []
+    is_clash = []
 
     items = response["Items"]
+
     for item in items:
-        x.append({
-            "value": item["data"]["x"],
+        acceleration.append({
+            "value": item["data"]["acceleration"],
             "timestamp": item["timestamp"]
         })
-        y.append({
-            "value": item["data"]["y"],
+        is_clash.append({
+            # "value": 1 if item["data"]["is_clash"] else 0,
+            "value": item["data"]["is_clash"],
             "timestamp": item["timestamp"]
         })
 
     res = {
-        "x": x,
-        "y": y
+        "acceleration": acceleration,
+        "is_clash": is_clash
     }
 
     return jsonify(res)
