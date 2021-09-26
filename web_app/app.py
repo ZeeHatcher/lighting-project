@@ -2,7 +2,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from contextlib import closing
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, g
+from flask import Flask, render_template, request, jsonify, g, url_for, redirect, request, session
 import json
 import os
 import sys
@@ -11,21 +11,31 @@ import traceback
 from werkzeug import secure_filename, abort
 import base64
 import io
+import requests
+from uuid import uuid4
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024 # 1MB maximum file size
+app.secret_key=uuid4().hex
 
 @app.route("/")
+@app.route("/index")
 def index():
+    if "access-token" in session and session["access-token"]:
+        print("access token found")
+        print("Logged in as", session['username'])
+    else:
+        return redirect('/login')
+    
     # Clients to access AWS services
     dynamodb = boto3.resource("dynamodb")
     iot = boto3.client("iot")
     iot_data = boto3.client("iot-data")
-
+    
     lightsticks = []
     modes = {}
     patterns = {}
-
+    
     # Get modes from DynamoDB and format into dict
     table_modes = dynamodb.Table("modes")
     items = table_modes.scan()["Items"]
@@ -65,7 +75,7 @@ def index():
             lightsticks.insert(0, state)
 #     print(lightsticks)
     
-    return render_template("index.html", lightsticks=lightsticks, modes=modes, patterns=patterns)
+    return render_template("index.html", username=session['username'],lightsticks=lightsticks, modes=modes, patterns=patterns)
 
 @app.route("/lightstick/<name>/data")
 def get_sensors_data(name):
@@ -128,6 +138,65 @@ def update(name):
 
     return jsonify(res)
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "GET":
+        if "access-token" in session and session["access-token"]:
+            return redirect('/')
+
+        return render_template("login.html")
+
+    elif request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        
+#     username = "admin"
+#     password = "lighting-project"
+        
+        client = boto3.client("cognito-idp")
+        try:
+            response = client.initiate_auth(
+                ClientId = CLIENT_ID,
+                AuthFlow="USER_PASSWORD_AUTH",
+                AuthParameters={
+                    "USERNAME": username,
+                    "PASSWORD": password,
+                }
+            )
+##### Run this if "NEW_PASSWORD_REQUIRED" Challenge Posed #####    
+#         chg = client.respond_to_auth_challenge(
+#             ClientId = CLIENT_ID,
+#             ChallengeName="NEW_PASSWORD_REQUIRED",
+#             ChallengeResponses={
+#                 "USERNAME":"username",
+#                 "NEW_PASSWORD": "password"
+#             },
+#             Session=response["Session"]            
+#         )
+            
+        except client.exceptions.NotAuthorizedException as e:
+            abort(422)
+                
+        except Exception as e:
+            abort(400)
+
+        access_token = response["AuthenticationResult"]["AccessToken"]
+        session['access-token'] = access_token
+        session['username'] = username    
+        
+        res = { "status": 200, "message": "Successfully logged in", "redirect": url_for("index") }
+            
+        return jsonify(res)
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session['access-token'] = None
+    session['username'] = None    
+
+    res = { "status": 200, "message": "Successfully logged out", "redirect": url_for("login") }
+
+    return jsonify(res)
+            
 @app.route("/lightstick/<name>/upload", methods=["POST"])
 def upload(name):
     s3 = boto3.resource("s3")
@@ -160,5 +229,6 @@ if __name__ == "__main__":
     # Constants
     MIME_TYPES = ["image/jpeg", "image/png", "audio/mpeg", "audio/wav"]
     S3_BUCKET = os.environ.get("S3_BUCKET")
+    CLIENT_ID = os.environ.get("COGNITO_USER_CLIENT_ID")
 
     app.run(host="0.0.0.0", port=5000, debug=True)
