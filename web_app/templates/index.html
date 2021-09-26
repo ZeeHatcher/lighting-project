@@ -147,7 +147,7 @@
                 depending on the pattern chosen, the light stick output should look something like the following:
                 </p>
                 <div class="text-center">
-                  <img>
+                  <img id="pattern_sample" class="border img-fluid">
                 </div>
               </div>
             </div>
@@ -652,6 +652,8 @@
 
             $("#colors > *").fadeIn(DURATION);
           });
+
+          $("#pattern_sample").attr("src", `static/img/${patterns[id].name}.gif`);
         }
 
         function onLogoutClick() {
