@@ -6,6 +6,8 @@
 #include <Adafruit_DotStar.h>
 #include <SPI.h>
 
+#include <Adafruit_MPU6050.h>
+
 #include "LightingConfig.h"
 
 #define WIFI_TIMEOUT_MS 20000
@@ -14,6 +16,10 @@ IPAddress server(address[0], address[1], address[2], address[3]);
 WiFiClient client;
 
 Adafruit_DotStar strip(NUM_PIXELS, 23, 18, DOTSTAR_BGR);
+Adafruit_MPU6050 mpu;
+Adafruit_Sensor* accel;
+
+sensors_event_t event;
 
 void connectToWiFi() {
   Serial.print("Connecting to WiFi");
@@ -46,6 +52,13 @@ void setup() {
   Serial.begin(9600);
   
   strip.begin();
+
+  if (!mpu.begin()) {
+    Serial.println("Failed to find Hibiscus Sense MPU6050 chip!");
+  }
+
+  accel = mpu.getAccelerometerSensor();
+
   strip.clear();
   strip.show();
 }
@@ -69,6 +82,11 @@ void loop() {
       
       strip.show();
     }
+
+    accel->getEvent(&event);
+    double mag = sqrt(pow(event.acceleration.x, 2) + pow(event.acceleration.y, 2) + pow(event.acceleration.z, 2));
+    client.print(mag);
+    client.print("|");
 
     // Limit loop rate to 30 frames per second
     delay(34);

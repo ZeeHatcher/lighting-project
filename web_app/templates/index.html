@@ -248,13 +248,12 @@
                 graphical visualisation of sensors data
                 </p>
 
-                <div class="row row-cols-1 row-cols-md-2 gx-5 gy-5">
-                  <div>
-                    <canvas id="chart-x"></canvas>
-                  </div>
-                  <div>
-                    <canvas id="chart-y"></canvas>
-                  </div>
+              <div class="row row-cols-1 row-cols-md-2 gx-5 gy-5">
+                <div>
+                  <canvas id="chart-acceleration"></canvas>
+                </div>
+                <div>
+                  <canvas id="chart-clash"></canvas>
                 </div>
               </div>
 
@@ -282,7 +281,7 @@
     <script>
       $(document).ready(function() {
         const DURATION = 200;
-        const FILE_SIZE_LIMIT = 1000000 // File size limit of 1MB
+        const FILE_SIZE_LIMIT = 25 * 1024 * 1024 // File size limit of 1MB
         const MIME_TYPES = {
           image: ["image/jpeg", "image/png"],
           audio: ["audio/mpeg", "audio/wav"]
@@ -312,12 +311,11 @@
             url: "/lightstick/" + current["name"] + "/data",
             method: "GET",
             success: function (res) {
-              console.log(res);
-              chartX.data.datasets[0].data = res["x"];
-              chartX.update();
+              chartAcceleration.data.datasets[0].data = res["acceleration"];
+              chartAcceleration.update();
 
-              chartY.data.datasets[0].data = res["y"];
-              chartY.update();
+              chartClash.data.datasets[0].data = res["is_clash"];
+              chartClash.update();
             },
             error: function (err) {
               console.log(err);
@@ -329,7 +327,6 @@
         function updateLightstick(field, value) {
           current[field] = value;
 
-          console.log("UPDATE:", current);
           updateStatus("loading","","#lightstick-status");
 
           // Send AJAX update request
@@ -338,7 +335,6 @@
             method: "POST",
             data: { field, value },
             success: function (res) {
-              console.log(res);
               updateStatus("success","","#lightstick-status");
             },
             error: function (err) {
@@ -378,7 +374,6 @@
         function uploadFile(file,type) {
           let fd = new FormData();
           fd.append("file", file);
-          console.log(file);
 
           $.ajax({
             url: `lightstick/${current["name"]}/upload`,
@@ -387,7 +382,6 @@
             processData: false,
             contentType: false,
             success: function(res) {
-              console.log(res);
               updateStatus("success","Uploaded","#upload-status-" + type);
             },
             error: function (err) {
@@ -683,8 +677,8 @@
         }
 
         // Generate charts
-        let chartX = generateChart($("#chart-x"), "x", []);
-        let chartY = generateChart($("#chart-y"), "y", []);
+        let chartAcceleration = generateChart($("#chart-acceleration"), "acceleration", []);
+        let chartClash = generateChart($("#chart-clash"), "clash", []);
         
         // Attach input change handlers
         //$(document).on("change", "#file-image",onInputFile);
