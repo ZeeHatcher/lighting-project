@@ -836,7 +836,7 @@ def loop():
         lightstick.update(c_r, c_g, c_b)
 
     # Limit to 30 frames per second
-    time.sleep(0.034)
+#     time.sleep(0.034)
 
 
 
