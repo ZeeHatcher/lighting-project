@@ -107,8 +107,20 @@
                 <figcaption class="figure-caption">High-level architectural diagram</figcaption>
               </figure>
 
-              <p class="mb-4">
-              Lorem...
+              <p class="mb-2">
+                This project features a DotStars LED strip constrolled by a Hibisucs Sense ESP32 microcontroller. The controller receives commands or data from a Raspberry Pi, the edge device through WiFI, where major calculations and processes are being done.
+              </p>
+
+              <p class="mb-2">
+                To achieve the Audio mode, a microphone has to be attached to the Raspberry Pi to collect audio data from the environment.
+              </p>
+
+              <p class="mb-2">
+                To allow communication between the users and the system, a website is hosted on the cloud using a AWS EC2 instance. When users make changes to the website, the selection is sent to DynamoDB, a NoSQL database, while files uploaded would be stored in a S3 bucket.
+              </p>
+
+              <p class="mb-2">
+                Whenever there are changes in the DynamoDB or S3, IoT Core gets the changes, and communicate with the edge device through MQTT, signalling the edge device to either switch mode or alter patterns.
               </p>
             </section>
           </div>
