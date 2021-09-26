@@ -150,7 +150,7 @@ class MusicMode(Mode):
         c_b = bytearray([0] * NUM_PIXELS)
         
         
-        if pygame.mixer.music.get_busy():
+        if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
             sound = 0
             place = int(pygame.mixer.music.get_pos()/1000*self._frames_per_sec)
             try:
@@ -693,12 +693,16 @@ def download_file(file_type):
 
     print("Downloading %s... " % file_type, end="")
     s3.download_file(S3_BUCKET, key, file_type)
-    print("Finished.")
+    print("Download completed.")
 
     # Reset mode to load in newly downloaded image
     if mode_id == 2 and file_type == "image":
         mode.exit()
         mode = ImageMode()
+
+    elif mode_id == 3 and file_type == "audio":
+        mode.exit()
+        mode = MusicMode()
 
 def start_download_thread(file_type):
     thread = threading.Thread(target=download_file, args=(file_type,))
