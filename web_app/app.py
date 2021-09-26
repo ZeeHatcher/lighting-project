@@ -15,7 +15,7 @@ import requests
 from uuid import uuid4
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024 # 1MB maximum file size
+app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024 # 1MB maximum file size
 app.secret_key=uuid4().hex
 
 @app.route("/")
