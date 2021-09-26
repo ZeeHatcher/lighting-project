@@ -40,6 +40,7 @@ from virtual import VirtualLightstick
 
 #lightsaber mode
 from mutagen.mp3 import MP3
+import librosa
 import random
 
 load_dotenv()
@@ -378,6 +379,8 @@ class ImageMode(Mode):
 
 class LightsaberMode(Mode):
     def __init__(self):
+        self._value = Value("f", 0)
+        self._thread = None
         self._phase = 0
         self._pixels = 0
 #         self._value_file = open("values.txt","r")
@@ -389,20 +392,28 @@ class LightsaberMode(Mode):
         pygame.mixer.init()
         pygame.mixer.set_num_channels(4)
         
-        self._direct = "/home/pi/Documents/lighting-project/edge/saber-sounds/"
+        self._direct = "./saber-sounds/"
         self._start_sound = self._direct+ "saber-on.wav"
         self._idle_sound = self._direct + "saber-idle.wav"
-        self._clash_sounds = ["saber-clash1.wav","saber-clash2.wav","saber-clash3.wav","saber-clash4.wav"]
+        # self._clash_sounds = ["saber-clash1.wav","saber-clash2.wav","saber-clash3.wav","saber-clash4.wav"]
+        self._clash_sounds = ["saber-clash1.wav"]
         self._swing_sound = self._direct + "saber-swing.wav"
         
 
     def run(self):
+        val = self._value.value
               
 #         c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
         c_r = bytearray([0] * NUM_PIXELS)
         c_g = bytearray([0] * NUM_PIXELS)
         c_b = bytearray([0] * NUM_PIXELS)
         colors = ['0000ff']
+
+        if self._thread == None:
+            print("Starting publish thread... ", end="")
+            self._thread = threading.Thread(target=publish_sensors_data, args=(self._value,))
+            self._thread.start()
+            print("Started.")
 
         if(self._phase == 1):
             self.pixels = NUM_PIXELS
@@ -422,13 +433,13 @@ class LightsaberMode(Mode):
 #             if channel.get_busy():
 #                 pass
 #             else:
-            if(self._value>21):
+            if(val > 21):
                 if(clash_channel.get_busy()):
                     pass
                 else:
                     clash_channel.play(clash_sound)
                     colors = ['ffffff']
-            elif(self._value>11):
+            elif(val > 11):
                 if(clash_channel.get_busy() or swing_channel.get_busy()):
                     pass
                 else:
@@ -439,13 +450,13 @@ class LightsaberMode(Mode):
                         swing_channel.play(swing_sound)
                         self._consequtive_val = 0
                     
-                    if(self._value>0.0 and abs(self._value-self._last_val)<=3):
+                    if(val >0.0 and abs(val - self._last_val)<=3):
                         self._consequtive_val += 1
                     else:
                         self._consequtive_val = 0
                         
         #             print("Consequtive:",self._consequtive_val)
-                    self._last_val = self._value
+                    self._last_val = val
             else:
                 pass
                       
@@ -485,18 +496,22 @@ class LightsaberMode(Mode):
     
     def exit(self):
 #         self._value_file.close()
-        pass
+        if self._thread != None:
+            print("Stopping publish thread... ", end="")
 
-    def _colorify(self, x):
-        return round(min(abs(x) * 0.05, 1) * 255)
+            self._thread.is_run = False
+            self._thread.join()
+
+            self._thread = None
+            print("Stopped publish thread.")
 
     @property
     def value(self):
-        return self._value
+        return self._value.value
 
     @value.setter
     def value(self, value):
-        self._value = value
+        self._value.value = value
 
 class Pattern(ABC):
     @abstractmethod
@@ -802,18 +817,16 @@ def publish_sensors_data(v):
     while getattr(t, "is_run", True):
         topic = "lightstick/" + THING_NAME + "/data"
         payload = {
-            "x": v.value,
-            "y": 1 / v.value if v.value > 0 else 1
+            "acceleration": v.value,
+            "is_clash": v.value > 21
         }
-
-        print(topic, payload)
 
         mqtt_connection.publish(
             topic=topic,
             payload=json.dumps(payload),
             qos=mqtt.QoS.AT_LEAST_ONCE)
 
-        time.sleep(5)
+        time.sleep(1)
 
     print("Stopped publish thread.")
 
@@ -897,9 +910,10 @@ def loop():
                     break
 
             else:
-                if data and mode_id == 5:
-                    buf += data.decode()
-                    print(buf)
+                if data:
+                    if mode_id == 5:
+                        buf += data.decode()
+                        print(buf)
                         
                 else:
                     print("Received 0 bytes. Connection to client is closed.")
