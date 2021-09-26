@@ -107,22 +107,64 @@
                   <img class="figure-img img-fluid" src="{{ url_for('static', filename='img/system_structure.png') }}">
                   <figcaption class="figure-caption">High-level architectural diagram</figcaption>
                 </figure>
+              </div>
 
-              <p class="mb-2">
-                This project features a DotStars LED strip constrolled by a Hibisucs Sense ESP32 microcontroller. The controller receives commands or data from a Raspberry Pi, the edge device through WiFI, where major calculations and processes are being done.
-              </p>
+              <div class="my-4">
+                <h6 class="m-0">node</h6>
 
-              <p class="mb-2">
-                To achieve the Audio mode, a microphone has to be attached to the Raspberry Pi to collect audio data from the environment.
-              </p>
+                <p>
+                The node consists of a DotStar LED Strip which is connected to a Hibiscus Sense ESP32 microcontroller.
+                The Hibiscus is capable of WiFi connectivity and also possesses a built-in MPU6050 accelerometer and gyroscope.
+                Using these capabilities, the Hibiscus is able to connect to the LAN and communicate with the edge device wirelessly, as well as easily provide data on the forces applied to the light stick.
+                </p>
 
-              <p class="mb-2">
-                To allow communication between the users and the system, a website is hosted on the cloud using a AWS EC2 instance. When users make changes to the website, the selection is sent to DynamoDB, a NoSQL database, while files uploaded would be stored in a S3 bucket.
-              </p>
+                <p>
+                The Hibiscus is programmed to convert color data received from the edge device into output on the Dotstar LED strip, and deliver accelerometer data to the edge device for processing.
+                </p>
+              </div>
 
-              <p class="mb-2">
-                Whenever there are changes in the DynamoDB or S3, IoT Core gets the changes, and communicate with the edge device through MQTT, signalling the edge device to either switch mode or alter patterns.
-              </p>
+              <div class="my-4">
+                <h6 class="m-0">edge</h6>
+
+                <p>
+                The edge device is responsible for the communication between the node and the cloud, where it receives commands from the remote user, downloads new image/audio files, and uploads sensors data into the cloud. This is achieved by using MQTT, a lightweight publish/subscribe messaging protocol, to communicate the required payloads with minimal network bandwidth.
+                </p>
+
+                <p>
+                This is also where most of the processing occurs, as the edge device has to process incoming input such as accelerometer data, image/audio file data and microphone audio, and convert them into color data that is understandable by the Hibiscus, which is then sent to the Hibiscus through WiFI.
+                </p>
+              </div>
+
+              <div class="my-4">
+                <h6 class="m-0">cloud</h6>
+
+                <p>
+                The cloud service used in this project is Amazon Web Services (AWS).
+                AWS provides a myriad of services, but only IoT Core, DynamoDB, S3 and EC2 are used for this project.
+                </p>
+
+                <p>
+                IoT Core is used as the intermediary between the node and the cloud storage in the form of DynamoDB and S3.
+                On one end, after receiving payload data from the node, making use of the provided Rules Engine, IoT Core will automatically route the data to DynamoDB and save them.
+                On the other end, after receiving commands from the user, IoT Core will update the node's state in the cloud, before sending the data down to the node for it to process.
+                </p>
+
+                <p>
+                DynamoDB is used to save sensors data from the node, as mentioned previously. This data is then pulled into this website to be displayed, as can be seen in Lightsaber Mode.
+                </p>
+
+                <p>
+                S3 is used to store user uploaded image and audio files. When new files are uploaded, S3 will automatically notify IoT Core, which will then be passed down to the corresponding node to inform them of the new file.
+                </p>
+
+                <p>
+                EC2 is used to launch server instances on the cloud, which in this context, is used to host the web server for this web interface.
+                </p>
+
+                <p>
+                All of these different parts work together to form the entire cloud infrastructure, which allows for the remote operation of the light sticks.
+                </p>
+              </div>
             </section>
           </div>
 
@@ -230,6 +272,13 @@
 
             <div id="panel-microphone">
               <h2 id="main-header mb-4">microphone</h2>
+
+              <div class="my-4">
+                <h6 class="m-0">device</h6>
+                <p>
+                please ensure that a microphone is connected to your Raspberry Pi.
+                </p>
+              </div>
 
               <div class="my-4">
                 <h6 class="m-0">expected output</h6>
