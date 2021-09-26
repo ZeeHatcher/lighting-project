@@ -395,8 +395,7 @@ class LightsaberMode(Mode):
         self._direct = "./saber-sounds/"
         self._start_sound = self._direct+ "saber-on.wav"
         self._idle_sound = self._direct + "saber-idle.wav"
-        # self._clash_sounds = ["saber-clash1.wav","saber-clash2.wav","saber-clash3.wav","saber-clash4.wav"]
-        self._clash_sounds = ["saber-clash1.wav"]
+        self._clash_sounds = ["saber-clash1.wav","saber-clash2.wav","saber-clash3.wav","saber-clash4.wav"]
         self._swing_sound = self._direct + "saber-swing.wav"
         
 
