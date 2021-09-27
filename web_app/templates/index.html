@@ -580,7 +580,8 @@
               $("#preview-image").removeAttr("src");
               return;
             }else{
-              $("#preview-image").attr("src",URL.createObjectURL(file));
+              if (type == "image") $("#preview-image").attr("src",URL.createObjectURL(file));
+
               if(submit){
                 //uploadStatus(msg,"uploading",type);
                  updateStatus("loading",msg,"#upload-status-" + type);
