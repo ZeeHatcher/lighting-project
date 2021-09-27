@@ -40,21 +40,27 @@
 
     <div class="d-flex justify-content-around">
       <div id="content" class="content p-4">
-        <header>
+        <header class="mb-5">
           <div class="row justify-content-end gy-2">
             <div class="col">
               <h1 class="no-break">
-                <!--Button-->
-                <a id="toggle-sidebar" class="cursor-pointer"><i class="bi bi-list icon"></i></a>
-                lighting_project
+                  <a id="toggle-sidebar" class="cursor-pointer"><i class="bi bi-list icon"></i></a>
+                  lighting_project
               </h1>
-              <div>
+
+              <nav id="pages" class="fs-5">
+                <a class="cursor-pointer" data-value="home"><i class="bi bi-house icon"></i></a>
+                <a class="cursor-pointer" data-value="info"><i class="bi bi-info-circle icon"></i></a>
+              </nav>
+
+              <div id="selected" class="mb-2">
                 <p class="m-0 fs-5 d-inline align-middle">
                   <span class="text-muted">selected:</span> <span id="lightstick-name"></span>
                 </p>
                 <span id="lightstick-status" class="align-middle fw-bolder"></span>
               </div>
             </div>
+
             <div class="col-auto">
               <div class="row">
                 <div class="text-end">
@@ -63,7 +69,7 @@
               </div>
 
               <div class="row">
-                <div class="col d-flex justify-content-end align-items-center">
+                <div id="switch" class="col d-flex justify-content-end align-items-center">
                   <span id="switch-label-off" class="fs-7 me-2 switch-label">off</span>
                   <div class="form-switch">
                     <input id="switch-power" class="form-check-input" type="checkbox">
@@ -83,96 +89,213 @@
           </div>
         </header>
 
-        <main id="panels" class="my-5" style="display: none;">
-          <div id="panel-basic">
-            <h2 id="main-header mb-4">basic</h2>
+        <main>
+          <div id="info" style="display: none;">
+            <section class="my-4">
+              <h2 id="main-header mb-4">about</h2>
 
-            <div class="my-4">
-              <h6 class="m-0">pattern</h6>
-              <p>
-                choose a lighting pattern
+              <p class="my-4">
+              The lighting_project is an IoT contraption that is designed to show off the core components of IoT. It features a smart light stick that can be connected to the Internet and is controllable remotely, allowing users to change its behaviour to show different light patterns, as well as make use of different inputs to generate interesting patterns.
               </p>
+            </section>
 
-              <div id="patterns" class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 gx-2 gy-2 btn-grid">
-                {% for id, pattern in patterns.items() %}
-                <div class="col"><button class="btn btn-primary" data-value={{ id }}>{{ pattern.name }}</button></div>
-                {% endfor %}
+            <section class="my-4">
+              <h2 id="main-header mb-4">how it works</h2>
+
+              <div class="my-4">
+                <figure class="figure text-center mb-4">
+                  <img class="figure-img img-fluid" src="{{ url_for('static', filename='img/system_structure.png') }}">
+                  <figcaption class="figure-caption">High-level architectural diagram</figcaption>
+                </figure>
               </div>
-            </div>
 
-            <div class="my-4">
-              <h6 class="m-0">color</h6>
-              <p>
-                set the color(s) displayed in the pattern
-              </p>
+              <div class="my-4">
+                <h6 class="m-0">node</h6>
 
-              <div id="colors" class="d-flex">
-                <button id="btn-submit-color" class="btn btn-primary">submit</button>
+                <p>
+                The node consists of a DotStar LED Strip which is connected to a Hibiscus Sense ESP32 microcontroller.
+                The Hibiscus is capable of WiFi connectivity and also possesses a built-in MPU6050 accelerometer and gyroscope.
+                Using these capabilities, the Hibiscus is able to connect to the LAN and communicate with the edge device wirelessly, as well as easily provide data on the forces applied to the light stick.
+                </p>
+
+                <p>
+                The Hibiscus is programmed to convert color data received from the edge device into output on the Dotstar LED strip, and deliver accelerometer data to the edge device for processing.
+                </p>
               </div>
-            </div>
+
+              <div class="my-4">
+                <h6 class="m-0">edge</h6>
+
+                <p>
+                The edge device is responsible for the communication between the node and the cloud, where it receives commands from the remote user, downloads new image/audio files, and uploads sensors data into the cloud. This is achieved by using MQTT, a lightweight publish/subscribe messaging protocol, to communicate the required payloads with minimal network bandwidth.
+                </p>
+
+                <p>
+                This is also where most of the processing occurs, as the edge device has to process incoming input such as accelerometer data, image/audio file data and microphone audio, and convert them into color data that is understandable by the Hibiscus, which is then sent to the Hibiscus through WiFI.
+                </p>
+              </div>
+
+              <div class="my-4">
+                <h6 class="m-0">cloud</h6>
+
+                <p>
+                The cloud service used in this project is Amazon Web Services (AWS).
+                AWS provides a myriad of services, but only IoT Core, DynamoDB, S3 and EC2 are used for this project.
+                </p>
+
+                <p>
+                IoT Core is used as the intermediary between the node and the cloud storage in the form of DynamoDB and S3.
+                On one end, after receiving payload data from the node, making use of the provided Rules Engine, IoT Core will automatically route the data to DynamoDB and save them.
+                On the other end, after receiving commands from the user, IoT Core will update the node's state in the cloud, before sending the data down to the node for it to process.
+                </p>
+
+                <p>
+                DynamoDB is used to save sensors data from the node, as mentioned previously. This data is then pulled into this website to be displayed, as can be seen in Lightsaber Mode.
+                </p>
+
+                <p>
+                S3 is used to store user uploaded image and audio files. When new files are uploaded, S3 will automatically notify IoT Core, which will then be passed down to the corresponding node to inform them of the new file.
+                </p>
+
+                <p>
+                EC2 is used to launch server instances on the cloud, which in this context, is used to host the web server for this web interface.
+                </p>
+
+                <p>
+                All of these different parts work together to form the entire cloud infrastructure, which allows for the remote operation of the light sticks.
+                </p>
+              </div>
+            </section>
           </div>
 
-          <div id="panel-image">
-            <h2 id="main-header mb-4">image</h2>
-            <div class="my-4">
-              <h6 class="m-0">upload</h6>
-              <p>
-                choose an image to be displayed on the lightstick
-              </p>
-              <!--<div class="row align-items-center justify-content-center mb-0">
-                <div class="col-auto">-->
+          <div id="panels" style="display: none;">
+            <div id="panel-basic">
+              <h2 id="main-header mb-4">basic</h2>
+
+              <div class="my-4">
+                <h6 class="m-0">pattern</h6>
+                <p>
+                choose a lighting pattern
+                </p>
+
+                <div id="patterns" class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 gx-2 gy-2 btn-grid">
+                  {% for id, pattern in patterns.items() %}
+                  <div class="col"><button class="btn btn-primary" data-value={{ id }}>{{ pattern.name }}</button></div>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <div class="my-4">
+                <h6 class="m-0">color</h6>
+                <p>
+                set the color(s) displayed in the pattern
+                </p>
+
+                <div id="colors" class="d-flex">
+                  <button id="btn-submit-color" class="btn btn-primary">submit</button>
+                </div>
+              </div>
+
+              <div class="my-4">
+                <h6 class="m-0">expected output</h6>
+                <p>
+                depending on the pattern chosen, the light stick output should look something like the following:
+                </p>
                 <div class="text-center">
-                  <input id="file-image" accept="image/jpeg, image/png" type="file" class="form-control-file">
+                  <img id="pattern_sample" class="border img-fluid">
+                </div>
+              </div>
+            </div>
+
+            <div id="panel-image">
+              <h2 id="main-header mb-4">image</h2>
+              <div class="my-4">
+                <h6 class="m-0">upload</h6>
+                <p>
+                choose an image to be displayed on the lightstick
+                </p>
+                <!--<div class="row align-items-center justify-content-center mb-0">
+                  <div class="col-auto">-->
+                    <div class="text-center">
+                      <input id="file-image" accept="image/jpeg, image/png" type="file" class="form-control-file">
+                      <br>
+                    </div>
+                    <div class="col-auto text-center">
+                      <img id="preview-image" class="p-2">
+                    </div>
+                    <div class="text-center">  
+                      <button id="btn-upload-image" class="btn btn-primary">upload</button>
+                      <span id="upload-status-image" class="mx-1 align-middle fw-bolder"></span>
+                    </div>
+                    <!--</div>-->
+
+                    <!--<div class="col-auto text-center">
+                      <img id="preview-image" class="p-2">
+                      </div>
+                      </div>-->
+
+              </div>
+
+              <div class="my-4">
+                <h6 class="m-0">expected output</h6>
+                <p>
+                the light stick should look like it is flashing rapidly, as it loops through each row of the image.
+                </p>
+              </div>
+            </div>
+
+            <div id="panel-audio">
+              <h2 id="main-header mb-4">audio</h2>
+              <div class="my-4">
+                <h6 class="m-0">upload</h6>
+                <p>
+                choose an audio file to be visualized on the lightstick
+                </p>
+
+                <div class="text-center">
+                  <input id="file-audio" accept="audio/mpeg, audio/wav" type="file" class="form-control-file">
                   <br>
                 </div>
-                <div class="col-auto text-center">
-                  <img id="preview-image" class="p-2">
+                <div class="text-center mt-3">
+                  <button id="btn-upload-audio" class="btn btn-primary">upload</button>
+                  <span id="upload-status-audio" class="mx-1 align-middle fw-bolder"></span>
                 </div>
-                <div class="text-center">  
-                  <button id="btn-upload-image" class="btn btn-primary">upload</button>
-                  <span id="upload-status-image" class="mx-1 align-middle fw-bolder"></span>
-                </div>
-                <!--</div>-->
-                
-                <!--<div class="col-auto text-center">
-                  <img id="preview-image" class="p-2">
-                </div>
-              </div>-->
-              
-            </div>
-          </div>
-
-          <div id="panel-audio">
-            <h2 id="main-header mb-4">audio</h2>
-            <div class="my-4">
-              <h6 class="m-0">upload</h6>
-              <p>
-                choose an audio file to be visualized on the lightstick
-              </p>
-
-              <div class="text-center">
-                <input id="file-audio" accept="audio/mpeg, audio/wav" type="file" class="form-control-file">
-                <br>
               </div>
-              <div class="text-center mt-3">
-                <button id="btn-upload-audio" class="btn btn-primary">upload</button>
-                <span id="upload-status-audio" class="mx-1 align-middle fw-bolder"></span>
+
+              <div class="my-4">
+                <h6 class="m-0">expected output</h6>
+                <p>
+                the light stick should react accordingly to the audio being played, like a music visualizer.
+                </p>
               </div>
             </div>
-          </div>
 
-          <div id="panel-microphone">
-            <h2 id="main-header mb-4">microphone</h2>
-          </div>
+            <div id="panel-microphone">
+              <h2 id="main-header mb-4">microphone</h2>
 
-          <div id="panel-lightsaber">
-            <h2 id="main-header mb-4">lightsaber</h2>
+              <div class="my-4">
+                <h6 class="m-0">device</h6>
+                <p>
+                please ensure that a microphone is connected to your Raspberry Pi.
+                </p>
+              </div>
 
-            <div class="my-4">
-              <h6 class="m-0">sensors</h6>
-              <p>
+              <div class="my-4">
+                <h6 class="m-0">expected output</h6>
+                <p>
+                the light stick should react accordingly to your voice input.
+                </p>
+              </div>
+            </div>
+
+            <div id="panel-lightsaber">
+              <h2 id="main-header mb-4">lightsaber</h2>
+
+              <div class="my-4">
+                <h6 class="m-0">sensors</h6>
+                <p>
                 graphical visualisation of sensors data
-              </p>
+                </p>
 
               <div class="row row-cols-1 row-cols-md-2 gx-5 gy-5">
                 <div>
@@ -181,6 +304,13 @@
                 <div>
                   <canvas id="chart-clash"></canvas>
                 </div>
+              </div>
+
+              <div class="my-4">
+                <h6 class="m-0">expected output</h6>
+                <p>
+                try swinging it around, and be one with the force. you should hear humming sounds as you swing, and clashing sounds when you apply abrupt force.
+                </p>
               </div>
             </div>
           </div>
@@ -345,6 +475,12 @@
           });
         }
 
+        function onPageSwitch() {
+          let id = $(this).data('value');
+
+          changeActivePage(id);
+        }
+
         function onModeSwitch() {
           let id = $(this).data("value");
 
@@ -402,6 +538,7 @@
           // Update site state
           $("#lightstick-name").text(current["name"]);
           $("#preview-image").attr("src","data:image/png;base64," + current["image"]);
+          changeActivePage("home");
           changeLightstick();
           toggleBlind(current.is_on);
           toggleSwitch(current.is_on);
@@ -471,8 +608,30 @@
 
           label.addClass("active");
         }
+
+        function changeActivePage(page) {
+          // Change "active" page button
+          $("#pages a i").removeClass("active");
+          $(`#pages a[data-value='${page}'] i`).addClass("active");
+
+          if (page == "info") {
+            $("#panels").fadeOut(DURATION, function() {
+              $("#info").fadeIn(DURATION);
+            });
+            $("#modes a").fadeOut(DURATION);
+            $("#switch *").fadeOut(DURATION);
+            $("#selected").fadeOut(DURATION);
+          } else {
+            $("#info").fadeOut(DURATION, function() {
+              $("#panels").fadeIn(DURATION);
+              $("#modes a").fadeIn(DURATION);
+              $("#switch *").fadeIn(DURATION);
+              $("#selected").fadeIn(DURATION);
+            });
+          }
+        }
         
-        function changeLightstick(){
+        function changeLightstick() {
           let items = $(".sidebar-item");
 
           items.each(function() {
@@ -549,6 +708,8 @@
 
             $("#colors > *").fadeIn(DURATION);
           });
+
+          $("#pattern_sample").attr("src", `static/img/${patterns[id].name}.gif`);
         }
 
         function onLogoutClick() {
@@ -585,6 +746,7 @@
           //disable file input for non admin users
           $(".form-control-file").prop("disabled",true);
         }
+        $(document).on("click", "#pages a", onPageSwitch);
         $(document).on("click", "#toggle-sidebar", onToggleSidebar);
         $(document).on("click", "#close-sidebar", onCloseSidebar);
         $(document).on("click", "#overlay", onCloseSidebar);
@@ -597,6 +759,7 @@
         changeLightstick();
         toggleBlind(current.is_on);
         toggleSwitch(current.is_on);
+        changeActivePage("home");
         changeActiveMode(current.mode);
         changeActivePattern(current.pattern);
       });
