@@ -3,14 +3,13 @@ from dotenv import load_dotenv
 import json
 from multiprocessing import Value
 import os
-import random
 import sys
 import threading
 import time
 import traceback
 
 # Cloud connectivity
-from awscrt import auth, io, mqtt, http
+from awscrt import io, mqtt
 from awsiot import iotshadow
 from awsiot import mqtt_connection_builder
 import boto3
@@ -24,7 +23,7 @@ from colorsys import hls_to_rgb
 from PIL import Image
 
 # Music Mode
-import numpy as np
+# import numpy as np
 import pygame
 # from audio_analyzer import *
 from pydub import AudioSegment
@@ -39,7 +38,6 @@ import socket
 from virtual import VirtualLightstick
 
 #lightsaber mode
-from mutagen.mp3 import MP3
 import librosa
 import random
 
