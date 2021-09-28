@@ -8,10 +8,11 @@ import os
 import sys
 import threading
 import traceback
-from werkzeug import secure_filename, abort
+# from werkzeug import secure_filename, abort
+from werkzeug.utils import secure_filename
+from werkzeug.exceptions import abort
 import base64
 import io
-import requests
 from uuid import uuid4
 
 app = Flask(__name__)
@@ -41,19 +42,21 @@ def index():
     items = table_modes.scan()["Items"]
     items = sorted(items, key=lambda k: k["id"])
     for item in items:
-        modes[int(item["id"])] = item
+        item["id"] = int(item["id"])
+        modes[item["id"]] = item
 
     # Get patterns from DynamoDB and format into dict
     table_patterns = dynamodb.Table("patterns")
     items = table_patterns.scan()["Items"]
     items = sorted(items, key=lambda k: k["id"])
     for item in items:
-        patterns[int(item["id"])] = item
+        item["id"] = int(item["id"])
+        item["num_colors"] = int(item["num_colors"])
+        patterns[item["id"]] = item
 
     # Get list of lightsticks and get reported shadow state
     res_things = iot.list_things_in_thing_group(thingGroupName='lightsticks')
     for thing in res_things["things"]:
-#         print(thing)
         res_shadow = iot_data.get_thing_shadow(thingName=thing)
         byte_str = res_shadow["payload"].read()
         payload = json.loads(byte_str.decode("utf-8"))
@@ -64,17 +67,15 @@ def index():
             
             s3 = boto3.resource("s3")
             bucket = s3.Bucket(S3_BUCKET)
-            #s3://lighting-bucket/lightstick_cherry/image
             object = bucket.Object(thing+'/image')
             file_stream = io.BytesIO()
             img_data = object.get().get('Body').read()
-#             object.download_fileobj(file_stream)
-            #"https://lighting-bucket.s3.ap-southeast-1.amazonaws.com/lightstick_cherry/image"
             state["image"] = base64.encodebytes(img_data).decode('utf-8')
 
             lightsticks.insert(0, state)
-#     print(lightsticks)
     
+    print(modes)
+    print(patterns)
     return render_template("index.html", username=session['username'],lightsticks=lightsticks, modes=modes, patterns=patterns)
 
 @app.route("/lightstick/<name>/data")
@@ -94,13 +95,12 @@ def get_sensors_data(name):
 
     for item in items:
         acceleration.append({
-            "value": item["data"]["acceleration"],
-            "timestamp": item["timestamp"]
+            "value": float(item["data"]["acceleration"]),
+            "timestamp": int(item["timestamp"])
         })
         is_clash.append({
-            # "value": 1 if item["data"]["is_clash"] else 0,
-            "value": item["data"]["is_clash"],
-            "timestamp": item["timestamp"]
+            "value": float(item["data"]["is_clash"]),
+            "timestamp": int(item["timestamp"])
         })
 
     res = {
