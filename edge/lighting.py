@@ -44,8 +44,6 @@ import random
 load_dotenv()
 
 NUM_PIXELS = int(os.environ.get("NUM_PIXELS"))
-BAUD_RATE = int(os.environ.get("BAUD_RATE"))
-SERIAL_CONN = os.environ.get("SERIAL_CONN")
 
 CERT_DIR = "./.certs/"
 CLIENT_ID = os.environ.get("CLIENT_ID") or str(uuid4())
