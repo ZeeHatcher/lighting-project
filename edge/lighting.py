@@ -3,14 +3,13 @@ from dotenv import load_dotenv
 import json
 from multiprocessing import Value
 import os
-import random
 import sys
 import threading
 import time
 import traceback
 
 # Cloud connectivity
-from awscrt import auth, io, mqtt, http
+from awscrt import io, mqtt
 from awsiot import iotshadow
 from awsiot import mqtt_connection_builder
 import boto3
@@ -24,7 +23,7 @@ from colorsys import hls_to_rgb
 from PIL import Image
 
 # Music Mode
-import numpy as np
+# import numpy as np
 import pygame
 # from audio_analyzer import *
 from pydub import AudioSegment
@@ -39,7 +38,6 @@ import socket
 from virtual import VirtualLightstick
 
 #lightsaber mode
-from mutagen.mp3 import MP3
 import librosa
 import random
 
@@ -110,9 +108,15 @@ class NullMode(Mode):
 class MusicMode(Mode):
 #     https://stackoverflow.com/questions/19529230/mp3-with-pyaudio?rq=1
     def __init__(self):
-        #/home/pi/Music/ftc2.ogg or audio
+        self._set = True
+
+        if not os.path.exists("audio"):
+            print("not exist")
+            self._set = False
+            return
+
         # Don't add songs with any extension
-        #The conversion will cause it to break T-T
+        # The conversion will cause it to break T-T
         filename = r"audio"
         try:
             self._wf = wave.open(filename,'rb')
@@ -149,36 +153,40 @@ class MusicMode(Mode):
         pygame.mixer.init(frequency=self._rate)
         pygame.mixer.music.load(filename)
         pygame.mixer.music.play()
-        
     
     def run(self):
+        if not self._set:
+            c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+
+            return c_r, c_g, c_b
+
         c_r = bytearray([0] * NUM_PIXELS)
         c_g = bytearray([0] * NUM_PIXELS)
         c_b = bytearray([0] * NUM_PIXELS)
         
-        
-        if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
-            sound = 0
-            place = int(pygame.mixer.music.get_pos()/1000*self._frames_per_sec)
-            try:
-                data = self._data[place:place+2048]
-                if(len(data)>1):
-                    reading = audioop.max(data,2)
-                else:
-                    reading = self._previous
-                
-                if(self._previous is 0):
-                    self._previous = reading
-                else:
-                    if(reading >= 32760 or abs(self._previous-reading)>20000):
-                        reading = self._previous
+        try:
+            if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                sound = 0
+                place = int(pygame.mixer.music.get_pos()/1000*self._frames_per_sec)
+                try:
+                    data = self._data[place:place+2048]
+                    if(len(data)>1):
+                        reading = audioop.max(data,2)
                     else:
+                        reading = self._previous
+                    
+                    if(self._previous is 0):
                         self._previous = reading
-                        
-                sound += reading
+                    else:
+                        if(reading >= 32760 or abs(self._previous-reading)>20000):
+                            reading = self._previous
+                        else:
+                            self._previous = reading
+                            
+                    sound += reading
 #                 print(reading)
-                percentage = int(sound/self._max * NUM_PIXELS)
-                
+                    percentage = int(sound/self._max * NUM_PIXELS)
+                    
 #                 if(self._pixels < percentage):
 #                     self._pixels += 1
 #                 
@@ -186,36 +194,40 @@ class MusicMode(Mode):
 #                     self._pixels -= 1
 #                 
 #                 percentage = self._pixels
-                    
-                minimum = int(0.05 * NUM_PIXELS)
-                if(time.time() - self._lastHeartBeat > 0.1 and percentage >0):
-        #                 print("Sending heartbeat")
-                    if(percentage < minimum):
-                        self._increaseHeartBeat = True
-                    if(percentage > (NUM_PIXELS - minimum)):
-                        self._increaseHeartBeat = False
                         
-                    if(self._increaseHeartBeat):
-                        percentage += minimum
-                        self._increaseHeartBeat = False
-                    else:
-                        percentage -= minimum
-                        self._increaseHeartBeat = True
-                    self._lastHeartBeat = time.time()
-            except:
+                    minimum = int(0.05 * NUM_PIXELS)
+                    if(time.time() - self._lastHeartBeat > 0.1 and percentage >0):
+            #                 print("Sending heartbeat")
+                        if(percentage < minimum):
+                            self._increaseHeartBeat = True
+                        if(percentage > (NUM_PIXELS - minimum)):
+                            self._increaseHeartBeat = False
+                            
+                        if(self._increaseHeartBeat):
+                            percentage += minimum
+                            self._increaseHeartBeat = False
+                        else:
+                            percentage -= minimum
+                            self._increaseHeartBeat = True
+                        self._lastHeartBeat = time.time()
+                except:
+                    percentage = 0
+            else:
                 percentage = 0
-        else:
-            percentage = 0
-        c_r[0:percentage] = bytearray(self._r[0:percentage])
-        c_g[0:percentage] = bytearray(self._g[0:percentage])
-        c_b[0:percentage] = bytearray(self._b[0:percentage])
-                
+            c_r[0:percentage] = bytearray(self._r[0:percentage])
+            c_g[0:percentage] = bytearray(self._g[0:percentage])
+            c_b[0:percentage] = bytearray(self._b[0:percentage])
+
+        except AttributeError:
+            c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+
         return c_r,c_g,c_b
     
     def exit(self):
-        self._wf.close()
-        print("Closed wave")
-        pygame.quit()
+        if self._set:
+            self._wf.close()
+            print("Closed wave")
+            pygame.quit()
 
 class AudioMode(Mode):
     def __init__(self):
@@ -325,6 +337,12 @@ class BasicMode(Mode):
 
 class ImageMode(Mode):
     def __init__(self):
+        self._set = True
+
+        if not os.path.exists("image"):
+            self._set = False
+            return
+
         # Load and resize image
         im = Image.open("image")
 
@@ -362,19 +380,22 @@ class ImageMode(Mode):
         self._row = 0
 
     def run(self):
-        c_r = bytearray(self._rows[self._row][0])
-        c_g = bytearray(self._rows[self._row][1])
-        c_b = bytearray(self._rows[self._row][2])
+        if self._set:
+            c_r = bytearray(self._rows[self._row][0])
+            c_g = bytearray(self._rows[self._row][1])
+            c_b = bytearray(self._rows[self._row][2])
 
-        self._row += 1
+            self._row += 1
 
-        if self._row >= len(self._rows):
-            self._row = 0
+            if self._row >= len(self._rows):
+                self._row = 0
+
+        else:
+            c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
 
         return c_r, c_g, c_b
 
     def exit(self):
-        pygame.quit()
         pass
 
 class LightsaberMode(Mode):
