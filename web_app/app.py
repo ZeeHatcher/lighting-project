@@ -8,10 +8,11 @@ import os
 import sys
 import threading
 import traceback
-from werkzeug import secure_filename, abort
+# from werkzeug import secure_filename, abort
+from werkzeug.utils import secure_filename
+from werkzeug.exceptions import abort
 import base64
 import io
-import requests
 from uuid import uuid4
 
 app = Flask(__name__)
@@ -95,11 +96,11 @@ def get_sensors_data(name):
     for item in items:
         acceleration.append({
             "value": float(item["data"]["acceleration"]),
-            "timestamp": item["timestamp"]
+            "timestamp": int(item["timestamp"])
         })
         is_clash.append({
             "value": float(item["data"]["is_clash"]),
-            "timestamp": item["timestamp"]
+            "timestamp": int(item["timestamp"])
         })
 
     res = {
