@@ -25,29 +25,68 @@
         <header>
           <h1>lighting_project</h1>
         </header>
-
         <main class="d-flex justify-content-center align-items-center" style="height: 90%;">
-          <div id="section-login">
-            <h6 class="text-lit">login</h6>
+			<div id="sections">
+			  <div id="section-login" style="display: block;">
+				<h6 class="text-lit">login</h6>
 
-            <form id="form-login" action="" class="needs-validation" novalidate>
-              <div class="form-row mb-2">
-                <input id="input-username" type="text" class="form-control" name="username" placeholder="username" required>
-                <div class="invalid-feedback">
-                  Please enter a username.
-                </div>
-              </div>
+				<form id="form-login" action="" class="needs-validation" novalidate>
+				  <div class="form-row mb-2">
+					<input id="input-username" type="text" class="form-control" name="username" placeholder="username" required>
+					<div class="invalid-feedback">
+					  Please enter a username.
+					</div>
+				  </div>
 
-              <div class="form-row mb-4">
-                <input id="input-password" type="password" class="form-control" name="password" placeholder="password" required>
-                <div class="invalid-feedback">
-                  Please enter a password.
-                </div>
-              </div>
+				  <div class="form-row">
+					<input id="input-password" type="password" class="form-control" name="password" placeholder="password" required>
+					<div class="invalid-feedback">
+					  Please enter a password.
+					</div>
+				  </div>
+				  
+				  <div class="text-end mb-4">
+					<a id="forgot" class="btn btn-text btn-alert fs-7 ms-1 text-end">Forgot password</a>
+				  </div>
 
-              <button class="d-block btn btn-primary m-auto" type="submit">Submit</button>
-            </form>
-          </div>
+				  <button class="d-block btn btn-primary m-auto" type="submit">Submit</button>
+				</form>
+			  </div>
+			  
+			  <div id="section-reset" style="display: none;">
+				<h6 class="text-lit">Reset Password</h6>
+
+				<form id="form-reset" action="" class="needs-validation" novalidate>
+				  <div class="form-row mb-2">
+				      
+					<input id="input-forgot-username" type="text" class="form-control" name="input-forgot-username" placeholder="username" required>
+					
+					<div class="invalid-feedback">
+					  Please enter a username.
+					</div>
+					<div class="text-end">
+					<a id="send-code" class="btn btn-text btn-alert fs-7 ms-1 text-end">Send confirmation code</a>
+					</div>
+				  </div>
+				  
+				  <div class="form-row mb-2">
+					<input id="input-code" type="text" class="form-control" name="code" placeholder="Confirmation Code" required>
+					<div class="invalid-feedback">
+					  Please enter given confirmation code.
+					</div>
+				  </div>
+
+				  <div class="form-row mb-4">
+					<input id="input-new-password" type="password" class="form-control" name="new-password" placeholder="password" required>
+					<div class="invalid-feedback">
+					  Please enter a new password.
+					</div>
+				  </div>
+
+				  <button class="d-block btn btn-primary m-auto" type="submit">Submit</button>
+				</form>
+			  </div>
+			</div>
         </main>
       </div>
     </div>
@@ -56,6 +95,8 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js" integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU=" crossorigin="anonymous"></script>
     <script>
       $(document).ready(function() {
+	  const DURATION = 200;
+	  
         var validation = Array.prototype.filter.call($("#form-login"), function(form) {
           form.addEventListener('submit', function(event) {
             event.preventDefault();
@@ -73,20 +114,104 @@
             return false;
           }, false);
         });
-	
-	function login(username,password){
-          $.ajax({
-            url: "/login",
-            method: "POST",
-            data: { "username": username, "password": password },
-            success: function (res) {
-              window.location = res.redirect;
-            },
-            error: function (err) {
-              alert("Something went wrong on the server...");
+	    
+		
+	var reset_validation = Array.prototype.filter.call($("#form-reset"), function(form) {
+          form.addEventListener('submit', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            form.classList.add('was-validated');
+
+            if (form.checkValidity() === true) {
+	      let frg_username = $("#input-forgot-username").val();
+              let code = $("#input-code").val();
+              let password = $("#input-new-password").val();
+
+              reset(frg_username,code, password);
             }
-          });
-	}
+            
+            return false;
+          }, false);
+        });
+
+	
+		function login(username,password){
+			  $.ajax({
+				url: "/login",
+				method: "POST",
+				data: { "username": username, "password": password },
+				success: function (res) {
+				  window.location = res.redirect;
+				},
+				error: function (err) {
+				  alert("Something went wrong on the server...");
+				}
+			});
+		}
+		
+		function reset(frg_username,code, password){
+			$.ajax({
+				url: "/reset",
+				method: "POST",
+				data: {"username":frg_username, "code": code, "new-password": password },
+				success: function (res) {
+				    if(res["status"] ==200){
+					toggleSection();
+				    }else{
+					alert(res["message"]);
+				    }
+				},
+				error: function (err) {
+				  alert("Something went wrong on the server...");
+				}
+			});
+		}
+		
+		function sendCode(){
+		    let username = $("#input-forgot-username").val();
+		    if(username){
+			$.ajax({
+				    url: "/sendcode",
+				    method: "POST",
+				    data: { "username": username},
+				    success: function (res) {
+				      alert(res.message);
+				    },
+				    error: function (err) {
+					alert(err);
+					console.log(err);
+				      alert("Something went wrong on the server...");
+				    }
+			    });
+		    }else{
+			alert("Please enter a username for receiving confirmation code");
+		    }
+		}
+		
+		function toggleSection(){
+			let prev = $("#sections > div").filter(function () {
+				return $(this).css("display") == "block";
+			});
+			
+			let now = $("#sections > div").filter(function () {
+				return $(this).css("display") == "none";
+			});
+			
+			prev.fadeOut(DURATION, function() {
+			    now.fadeIn(DURATION);
+			});
+			
+			<!-- prev.fadeOut(DURATION); -->
+			
+			<!-- let now = $("#sections > div").filter(function () { -->
+				<!-- return $(this).css("display") == "none"; -->
+			<!-- }); -->
+			<!-- now.fadeIn(DURATION); -->
+		}
+		
+		$(document).on("click", "#forgot", toggleSection);
+		$(document).on("click", "#send-code", sendCode);
       });
     </script>
   </body>

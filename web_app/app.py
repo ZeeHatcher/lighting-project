@@ -164,20 +164,21 @@ def login():
                 }
             )
 ##### Run this if "NEW_PASSWORD_REQUIRED" Challenge Posed #####    
-#         chg = client.respond_to_auth_challenge(
-#             ClientId = CLIENT_ID,
-#             ChallengeName="NEW_PASSWORD_REQUIRED",
-#             ChallengeResponses={
-#                 "USERNAME":"username",
-#                 "NEW_PASSWORD": "password"
-#             },
-#             Session=response["Session"]            
-#         )
+#             chg = client.respond_to_auth_challenge(
+#                 ClientId = CLIENT_ID,
+#                 ChallengeName="NEW_PASSWORD_REQUIRED",
+#                 ChallengeResponses={
+#                     "USERNAME":username,
+#                     "NEW_PASSWORD": "testing1"
+#                 },
+#                 Session=response["Session"]            
+#             )
             
         except client.exceptions.NotAuthorizedException as e:
             abort(422)
                 
         except Exception as e:
+            print(e)
             abort(400)
 
         access_token = response["AuthenticationResult"]["AccessToken"]
@@ -187,6 +188,66 @@ def login():
         res = { "status": 200, "message": "Successfully logged in", "redirect": url_for("index") }
             
         return jsonify(res)
+    
+    
+@app.route("/sendcode", methods=["POST"])
+def sendCode():
+    client = boto3.client("cognito-idp")
+#     print(request.form["username"])
+    try:
+        response = client.forgot_password(
+            ClientId = CLIENT_ID,
+            Username = request.form["username"]
+        )
+        print(response)
+        
+    except client.exceptions.LimitExceededException as e:
+        print("Confirmation Code request limit reached")
+        res = { "status": 422, "message": "Confirmation code limit reached"}
+        return jsonify(res)
+#         abort(422)
+        
+    except Exception as e:
+        print(e)
+        
+    res = { "status": 200, "message": "Confirmation code sent"}
+    return jsonify(res)
+
+@app.route("/reset", methods=["POST"])
+def reset():
+    input_username = request.form["username"]
+    code = request.form["code"]
+    password = request.form["new-password"]
+        
+#     username = "admin"
+#     password = "lighting-project"
+    
+    client = boto3.client("cognito-idp")
+    try:
+        response = client.confirm_forgot_password(
+            ClientId = CLIENT_ID,
+            Username = input_username,
+            ConfirmationCode = code,
+            Password = password
+        )
+        print(response)
+        
+    except client.exceptions.ExpiredCodeException as e:
+        print("Code Expired")
+        res = { "status": 422, "message": "Confirmation code expired"}
+        return jsonify(res)
+            
+    except Exception as e:
+        print(e)
+        abort(400)
+
+#     access_token = response["AuthenticationResult"]["AccessToken"]
+#     session['access-token'] = access_token
+#     session['username'] = username    
+    
+    res = { "status": 200, "message": "Successfully logged in"}
+        
+    return jsonify(res)
 
 @app.route("/logout", methods=["POST"])
 def logout():
