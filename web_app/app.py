@@ -239,11 +239,7 @@ def reset():
             
     except Exception as e:
         print(e)
-        abort(400)
-
-#     access_token = response["AuthenticationResult"]["AccessToken"]
-#     session['access-token'] = access_token
-#     session['username'] = username    
+        abort(400) 
     
     res = { "status": 200, "message": "Successfully logged in"}
         
