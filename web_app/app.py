@@ -1,3 +1,4 @@
+import botocore
 import boto3
 from boto3.dynamodb.conditions import Key
 from contextlib import closing
@@ -14,6 +15,9 @@ from werkzeug.exceptions import abort
 import base64
 import io
 from uuid import uuid4
+
+# Constants
+MIME_TYPES = ["image/jpeg", "image/png", "audio/mpeg", "audio/wav"]
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024 # 1MB maximum file size
@@ -32,6 +36,8 @@ def index():
     dynamodb = boto3.resource("dynamodb")
     iot = boto3.client("iot")
     iot_data = boto3.client("iot-data")
+    s3 = boto3.resource("s3")
+    bucket = s3.Bucket(os.environ.get("S3_BUCKET"))
     
     lightsticks = []
     modes = {}
@@ -64,18 +70,22 @@ def index():
         if payload["state"] and payload["state"]["reported"]:
             state = payload["state"]["reported"]
             state["name"] = thing
+            object = bucket.Object(thing + '/image')
             
-            s3 = boto3.resource("s3")
-            bucket = s3.Bucket(S3_BUCKET)
-            object = bucket.Object(thing+'/image')
-            file_stream = io.BytesIO()
-            img_data = object.get().get('Body').read()
-            state["image"] = base64.encodebytes(img_data).decode('utf-8')
+            try:
+                img_data = object.get().get('Body').read()
+            except s3.meta.client.exceptions.NoSuchKey:
+                state["image"] = ""
+            except botocore.exceptions.ClientError as error:
+                if error.response["Error"]["Code"] == "AccessDenied":
+                    state["image"] = ""
+                else:
+                    raise error
+            else:
+                state["image"] = base64.encodebytes(img_data).decode('utf-8')
 
             lightsticks.insert(0, state)
-    
-    print(modes)
-    print(patterns)
+
     return render_template("index.html", username=session['username'],lightsticks=lightsticks, modes=modes, patterns=patterns)
 
 @app.route("/lightstick/<name>/data")
@@ -160,7 +170,7 @@ def login():
         client = boto3.client("cognito-idp")
         try:
             response = client.initiate_auth(
-                ClientId = CLIENT_ID,
+                ClientId=os.environ.get("COGNITO_USER_CLIENT_ID"),
                 AuthFlow="USER_PASSWORD_AUTH",
                 AuthParameters={
                     "USERNAME": username,
@@ -204,7 +214,7 @@ def logout():
 @app.route("/lightstick/<name>/upload", methods=["POST"])
 def upload(name):
     s3 = boto3.resource("s3")
-    bucket = s3.Bucket(S3_BUCKET)
+    bucket = s3.Bucket(os.environ.get("S3_BUCKET"))
 
     f = request.files["file"]
 
@@ -229,10 +239,5 @@ def upload(name):
 if __name__ == "__main__":
     # Load .env file for development
     load_dotenv()
-
-    # Constants
-    MIME_TYPES = ["image/jpeg", "image/png", "audio/mpeg", "audio/wav"]
-    S3_BUCKET = os.environ.get("S3_BUCKET")
-    CLIENT_ID = os.environ.get("COGNITO_USER_CLIENT_ID")
 
     app.run(host="0.0.0.0", port=5000, debug=True)
