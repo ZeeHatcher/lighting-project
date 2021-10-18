@@ -75,6 +75,11 @@ def index():
                 img_data = object.get().get('Body').read()
             except s3.meta.client.exceptions.NoSuchKey:
                 state["image"] = ""
+            except botocore.exceptions.ClientError as error:
+                if error.response["Error"]["Code"] == "AccessDenied":
+                    state["image"] = ""
+                else:
+                    raise error
             else:
                 state["image"] = base64.encodebytes(img_data).decode('utf-8')
 
