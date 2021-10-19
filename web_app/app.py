@@ -190,9 +190,6 @@ def login():
             
         except client.exceptions.NotAuthorizedException as e:
             abort(422)
-                
-        except Exception as e:
-            abort(400)
 
         access_token = response["AuthenticationResult"]["AccessToken"]
         session['access-token'] = access_token

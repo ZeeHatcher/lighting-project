@@ -65,8 +65,8 @@ class LockedData:
         self.lock = threading.Lock()
         self.shadow_state = {
             "is_on": False,
-            "mode": 0,
-            "pattern": 0,
+            "mode": 1,
+            "pattern": 1,
             "colors": [],
             "upload_image": 0,
             "upload_audio": 0,
@@ -867,6 +867,7 @@ def change_shadow_state():
     )
     future = shadow_client.publish_update_shadow(request, mqtt.QoS.AT_LEAST_ONCE)
     future.add_done_callback(on_publish_update_shadow)
+    print("Change requested")
 
 
 
