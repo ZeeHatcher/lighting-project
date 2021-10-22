@@ -29,6 +29,7 @@ Environment="PATH=/home/ec2-user/.venv/flask-app/bin"
 Environment="AWS_DEFAULT_REGION=ap-southeast-1"
 Environment="S3_BUCKET=lighting-project"
 Environment="COGNITO_USER_CLIENT_ID=<CLIENT_ID>"
+Environment="USERPOOL_ID=<USERPOOL_ID>"
 ExecStart=/bin/bash -c 'source /home/ec2-user/.venv/flask-app/bin/activate; gunicorn --bind 0.0.0.0:5000 wsgi:app'
 Restart=always
 

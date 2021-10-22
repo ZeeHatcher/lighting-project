@@ -119,36 +119,49 @@ aws s3api put-bucket-notification-configuration \
 # ---==============---
 
 # ---=== Cognito ===---
-USER_POOL_ID=$(aws cognito-idp create-user-pool \
+# Create user pool and client for web server use
+USERPOOL_ID=$(aws cognito-idp create-user-pool \
   --pool-name LPUserPool \
   --policies "PasswordPolicy={MinimumLength=8,RequireUppercase=false,RequireLowercase=false,RequireNumbers=false,RequireSymbols=false,TemporaryPasswordValidityDays=365}" \
   | jq -r ".UserPool.Id")
 
 CLIENT_ID=$(aws cognito-idp create-user-pool-client \
-  --user-pool-id $USER_POOL_ID \
+  --user-pool-id $USERPOOL_ID \
   --client-name LPWebServer \
   --explicit-auth-flows "ALLOW_ADMIN_USER_PASSWORD_AUTH" "ALLOW_USER_PASSWORD_AUTH" \
   | jq -r ".UserPoolClient.ClientId")
 
+# Create user groups and user accounts
 aws cognito-idp create-group \
-  --user-pool-id $USER_POOL_ID \
+  --user-pool-id $USERPOOL_ID \
   --group-name admin
 
 aws cognito-idp admin-create-user \
-    --user-pool-id $USER_POOL_ID \
+    --user-pool-id $USERPOOL_ID \
     --username admin \
     --message-action SUPPRESS
 
 aws cognito-idp admin-set-user-password \
-  --user-pool-id $USER_POOL_ID \
+  --user-pool-id $USERPOOL_ID \
   --username admin \
   --password lighting-project \
   --permanent
 
 aws cognito-idp admin-add-user-to-group \
-  --user-pool-id $USER_POOL_ID \
+  --user-pool-id $USERPOOL_ID \
   --username admin \
   --group-name admin
+
+aws cognito-idp admin-create-user \
+    --user-pool-id $USERPOOL_ID \
+    --username user \
+    --message-action SUPPRESS
+
+aws cognito-idp admin-set-user-password \
+  --user-pool-id $USERPOOL_ID \
+  --username user \
+  --password lighting-project \
+  --permanent
 # ---===============---
 
 # ---=== EC2 ===---
@@ -169,7 +182,7 @@ INSTANCE_ID=$(aws ec2 run-instances \
   --image-id ami-073998ba87e205747 \
   --instance-type t2.micro \
   --security-group-ids $SECURITY_GROUP_ID \
-  --user-data "$(sed "s/<CLIENT_ID>/$CLIENT_ID/g" ec2/userdata.sh)" \
+  --user-data "$(sed "s/<CLIENT_ID>/$CLIENT_ID/g" ec2/userdata.sh | sed "s/<USERPOOL_ID>/$USERPOOL_ID/g")" \
   --iam-instance-profile Name=LPRoleForEC2 \
   --count 1 \
   | jq -r ".Instances[0].InstanceId")
