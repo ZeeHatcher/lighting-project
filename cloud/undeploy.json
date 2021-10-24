@@ -1,0 +1,5 @@
+{
+  "INSTANCE_ID": "instance",
+  "USERPOOL_ID": "userpool",
+  "S3_BUCKET": "bucket"
+}

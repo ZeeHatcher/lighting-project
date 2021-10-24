@@ -9,6 +9,9 @@ ROOT_DIR=$(pwd)
 # Retrieve Account ID
 ACCOUNT_ID=$(aws sts get-caller-identity | jq -r ".Account")
 
+# Generate "unique" S3 bucket name
+S3_BUCKET=$(echo "lighting-project-$RANDOM")
+
 # ---=== IAM ===---
 # Create roles with required policies
 aws iam create-role \
@@ -33,7 +36,7 @@ aws iam create-role \
 aws iam put-role-policy \
   --role-name LPRoleForEC2 \
   --policy-name LPPolicyForLightstickDataReadWriteAccess \
-  --policy-document "$(sed "s/<ACCOUNT_ID>/$ACCOUNT_ID/g" policies/ec2.json)"
+  --policy-document "$(sed "s/<ACCOUNT_ID>/$ACCOUNT_ID/g" policies/ec2.json | sed "s/<S3_BUCKET>/$S3_BUCKET/g")"
 aws iam create-instance-profile --instance-profile-name LPRoleForEC2
 aws iam add-role-to-instance-profile \
   --instance-profile-name LPRoleForEC2 \
@@ -73,7 +76,7 @@ aws dynamodb create-table \
 # ---=== S3 ===---
 # Create bucket
 aws s3api create-bucket \
-  --bucket lighting-project \
+  --bucket $S3_BUCKET \
   --create-bucket-configuration LocationConstraint=ap-southeast-1
 # ---==========---
 
@@ -109,12 +112,12 @@ aws lambda add-permission \
   --statement-id LPPolicyForLambdaInvokeFunctionAccess \
   --action lambda:InvokeFunction \
   --principal s3.amazonaws.com \
-  --source-arn arn:aws:s3:::lighting-project \
+  --source-arn arn:aws:s3:::$S3_BUCKET \
   --source-account $ACCOUNT_ID
 
 # Setup S3 trigger
 aws s3api put-bucket-notification-configuration \
-  --bucket lighting-project \
+  --bucket $S3_BUCKET \
   --notification-configuration "$(sed "s/<ACCOUNT_ID>/$ACCOUNT_ID/g" lambda/notification.json)"
 # ---==============---
 
@@ -182,7 +185,7 @@ INSTANCE_ID=$(aws ec2 run-instances \
   --image-id ami-073998ba87e205747 \
   --instance-type t2.micro \
   --security-group-ids $SECURITY_GROUP_ID \
-  --user-data "$(sed "s/<CLIENT_ID>/$CLIENT_ID/g" ec2/userdata.sh | sed "s/<USERPOOL_ID>/$USERPOOL_ID/g")" \
+  --user-data "$(sed "s/<CLIENT_ID>/$CLIENT_ID/g" ec2/userdata.sh | sed "s/<USERPOOL_ID>/$USERPOOL_ID/g" | sed "s/<S3_BUCKET>/$S3_BUCKET/g")" \
   --iam-instance-profile Name=LPRoleForEC2 \
   --count 1 \
   | jq -r ".Instances[0].InstanceId")
@@ -191,3 +194,14 @@ INSTANCE_ID=$(aws ec2 run-instances \
 # Insert preset data into DynamoDB when initialization is complete
 aws dynamodb batch-write-item --request-items file://dynamodb/modes.json
 aws dynamodb batch-write-item --request-items file://dynamodb/patterns.json
+
+# Write IDs to .json file that can be used for undeployment
+tee undeploy.json > /dev/null <<EOT
+{
+  "CLIENT_ID": "$CLIENT_ID",
+  "USERPOOL_ID": "$USERPOOL_ID",
+  "S3_BUCKET": "$S3_BUCKET",
+  "SECURITY_GROUP_ID": "$SECURITY_GROUP_ID",
+  "INSTANCE_ID": "$INSTANCE_ID",
+}
+EOT
