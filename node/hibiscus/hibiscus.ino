@@ -23,6 +23,7 @@ sensors_event_t event;
 
 void connectToWiFi() {
   Serial.print("Connecting to WiFi");
+  Serial.println(WIFI_SSID);
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
@@ -37,6 +38,8 @@ void connectToWiFi() {
     Serial.println(" Failed!");
   } else {
     Serial.println(" Connected!");
+    Serial.print("IP address is : ");
+    Serial.println(WiFi.localIP());
   }
 }
 
