@@ -1,0 +1,19 @@
+{
+  "LambdaFunctionConfigurations": [
+    {
+      "Id": "LPNotificationForNewFile",
+      "LambdaFunctionArn": "arn:aws:lambda:ap-southeast-1:<ACCOUNT_ID>:function:LPFunctionForUploadNotification",
+      "Events": [ "s3:ObjectCreated:*" ],
+      "Filter": {
+        "Key": {
+          "FilterRules": [
+            {
+              "Name": "prefix",
+              "Value": "lightstick"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

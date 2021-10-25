@@ -1,0 +1,19 @@
+{
+  "sql": "SELECT acceleration, is_clash FROM 'lightstick/+/data'",
+  "ruleDisabled": false,
+  "awsIotSqlVersion": "2016-03-23",
+  "actions": [{
+    "dynamoDB": {
+      "tableName": "sensors_data",
+      "roleArn": "arn:aws:iam::<ACCOUNT_ID>:role/LPRoleForIoT",
+      "operation": "INSERT",
+      "hashKeyField": "thing_name",
+      "hashKeyValue": "${topic(2)}",
+      "hashKeyType": "STRING",
+      "rangeKeyField": "timestamp",
+      "rangeKeyValue": "${timestamp()}",
+      "rangeKeyType": "NUMBER",
+      "payloadField": "data"
+    }
+  }]
+}
