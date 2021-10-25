@@ -39,7 +39,7 @@
         "s3:GetObject",
         "s3:PutObject"
       ],
-      "Resource": "arn:aws:s3:::lighting-project/lightstick*"
+      "Resource": "arn:aws:s3:::<S3_BUCKET>/lightstick*"
     }
   ]
 }

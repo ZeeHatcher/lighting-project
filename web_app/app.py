@@ -1,20 +1,24 @@
+import base64
 import botocore
 import boto3
 from boto3.dynamodb.conditions import Key
 from contextlib import closing
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, g, url_for, redirect, request, session
+from flask import Flask, render_template, request, jsonify, g, url_for, redirect, request, session, make_response
+from jose import jwk, jwt
+from jose.utils import base64url_decode
 import json
 import os
 import sys
 import threading
 import traceback
-# from werkzeug import secure_filename, abort
+import urllib.request
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import abort
-import base64
-import io
 from uuid import uuid4
+
+# Load .env file for development
+load_dotenv()
 
 # Constants
 MIME_TYPES = ["image/jpeg", "image/png", "audio/mpeg", "audio/wav"]
@@ -23,14 +27,25 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024 # 1MB maximum file size
 app.secret_key=uuid4().hex
 
+keys_url = 'https://cognito-idp.ap-southeast-1.amazonaws.com/{}/.well-known/jwks.json'.format(os.getenv("USERPOOL_ID"))
+with urllib.request.urlopen(keys_url) as f:
+  response = f.read()
+keys = json.loads(response.decode('utf-8'))['keys']
+
+@app.errorhandler(401)
+def unauthorized_handler(error):
+    return make_response(jsonify({ "redirect": url_for("login") }), 401)
+
 @app.route("/")
 @app.route("/index")
 def index():
-    if "access-token" in session and session["access-token"]:
-        print("access token found")
-        print("Logged in as", session['username'])
+    if session.get("access-token"):
+        claims = decode_access_token(session.get("access-token"))
+
+        if not claims:
+            return redirect(url_for("login"))
     else:
-        return redirect('/login')
+        return redirect(url_for("login"))
     
     # Clients to access AWS services
     dynamodb = boto3.resource("dynamodb")
@@ -86,7 +101,11 @@ def index():
 
             lightsticks.insert(0, state)
 
-    return render_template("index.html", username=session['username'],lightsticks=lightsticks, modes=modes, patterns=patterns)
+    return render_template(
+        "index.html",
+        lightsticks=lightsticks,
+        modes=modes,
+        patterns=patterns)
 
 @app.route("/lightstick/<name>/data")
 def get_sensors_data(name):
@@ -113,15 +132,23 @@ def get_sensors_data(name):
             "timestamp": int(item["timestamp"])
         })
 
-    res = {
+    return {
         "acceleration": acceleration,
         "is_clash": is_clash
     }
 
-    return jsonify(res)
-
 @app.route("/lightstick/<name>", methods=["POST"])
 def update(name):
+    if session.get("access-token"):
+        claims = decode_access_token(session.get("access-token"))
+
+        if not claims:
+            abort(401)
+        elif not claims.get("cognito:groups") or "admin" not in claims.get("cognito:groups"):
+            abort(403)
+    else:
+        abort(401)
+
     iot_data = boto3.client("iot-data")
 
     field = request.form["field"]
@@ -146,17 +173,17 @@ def update(name):
     byte_str = json.dumps(payload)
 
     response = iot_data.update_thing_shadow(thingName=name, payload=byte_str)
-    print(response)
 
-    res = { "status": 200, "message": "Successfully updated lightstick shadow." }
-
-    return jsonify(res)
+    return "", 204
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
-        if "access-token" in session and session["access-token"]:
-            return redirect('/')
+        if session.get("access-token"):
+            claims = decode_access_token(session.get("access-token"))
+
+            if claims:
+                return redirect('index')
 
         return render_template("login.html")
 
@@ -188,28 +215,34 @@ def login():
 #             Session=response["Session"]            
 #         )
             
-        except client.exceptions.NotAuthorizedException as e:
-            abort(422)
+        except (client.exceptions.NotAuthorizedException, client.exceptions.UserNotFoundException) as e:
+            abort(401)
 
         access_token = response["AuthenticationResult"]["AccessToken"]
         session['access-token'] = access_token
         session['username'] = username    
-        
-        res = { "status": 200, "message": "Successfully logged in", "redirect": url_for("index") }
             
-        return jsonify(res)
+        return { "redirect": url_for("index") }
 
 @app.route("/logout", methods=["POST"])
 def logout():
-    session['access-token'] = None
-    session['username'] = None    
+    session.pop("access-token", None)
+    session.pop("username", None)
 
-    res = { "status": 200, "message": "Successfully logged out", "redirect": url_for("login") }
-
-    return jsonify(res)
+    return { "redirect": url_for("login") }
             
 @app.route("/lightstick/<name>/upload", methods=["POST"])
 def upload(name):
+    if session.get("access-token"):
+        claims = decode_access_token(session.get("access-token"))
+
+        if not claims:
+            abort(401)
+        elif not claims.get("cognito:groups") or "admin" not in claims.get("cognito:groups"):
+            abort(403)
+    else:
+        abort(401)
+
     s3 = boto3.resource("s3")
     bucket = s3.Bucket(os.environ.get("S3_BUCKET"))
 
@@ -221,20 +254,38 @@ def upload(name):
     file_type = f.content_type.split("/")[0]
     f.filename = name + "/" + file_type
 
-    try:
-        bucket.upload_fileobj(f, f.filename)
-    except Exception as e:
-        print("Something happened: ", e)
+    bucket.upload_fileobj(f, f.filename)
 
-        res = { "status": 400, "message": "Something went wrong on the server." }
-        return jsonify(res)
+    return "", 204
 
-    res = { "status": 200, "message": "Successfully uploaded file." }
+def decode_access_token(token):
+    # get the kid from the headers prior to verification
+    headers = jwt.get_unverified_headers(token)
+    kid = headers['kid']
+    # search for the kid in the downloaded public keys
+    key_index = -1
+    for i in range(len(keys)):
+        if kid == keys[i]['kid']:
+            key_index = i
+            break
+    if key_index == -1:
+        return False
+    # construct the public key
+    public_key = jwk.construct(keys[key_index])
+    # get the last two sections of the token,
+    # message and signature (encoded in base64)
+    message, encoded_signature = str(token).rsplit('.', 1)
+    # decode the signature
+    decoded_signature = base64url_decode(encoded_signature.encode('utf-8'))
+    # verify the signature
+    if not public_key.verify(message.encode("utf8"), decoded_signature):
+        return False
 
-    return jsonify(res)
+    # since we passed the verification, we can now safely
+    # use the unverified claims
+    claims = jwt.get_unverified_claims(token)
+    # now we can use the claims
+    return claims
 
 if __name__ == "__main__":
-    # Load .env file for development
-    load_dotenv()
-
     app.run(host="0.0.0.0", port=5000, debug=True)
