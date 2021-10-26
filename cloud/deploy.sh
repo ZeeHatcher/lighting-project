@@ -187,6 +187,7 @@ INSTANCE_ID=$(aws ec2 run-instances \
   --security-group-ids $SECURITY_GROUP_ID \
   --user-data "$(sed "s/<CLIENT_ID>/$CLIENT_ID/g" ec2/userdata.sh | sed "s/<USERPOOL_ID>/$USERPOOL_ID/g" | sed "s/<S3_BUCKET>/$S3_BUCKET/g")" \
   --iam-instance-profile Name=LPRoleForEC2 \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=name,Value=LPWebServer}]' \
   --count 1 \
   | jq -r ".Instances[0].InstanceId")
 # ---===========---
