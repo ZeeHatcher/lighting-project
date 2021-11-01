@@ -53,9 +53,12 @@ class TestBasicMode(unittest.TestCase):
         lighting.locked_data.shadow_state["colors"].append("FF0000")
 
         colored = bytearray([255] * lighting.NUM_PIXELS)
+        not_colored = bytearray([0] * lighting.NUM_PIXELS)
 
         c_r, c_g, c_b = self.mode.run()
         self.assertEqual(c_r, colored)
+        self.assertEqual(c_g, not_colored)
+        self.assertEqual(c_b, not_colored)
 
     def test_dot_pattern(self):
         lighting.locked_data.shadow_state["pattern"] = 2
@@ -87,7 +90,7 @@ class TestBasicMode(unittest.TestCase):
             else:
                 self.assertEqual(c_r, not_coloured)
 
-    def test_blink_pattern(self):
+    def test_breathe_pattern(self):
         lighting.locked_data.shadow_state["pattern"] = 4
         lighting.locked_data.shadow_state["colors"].append("FF0000")
 
@@ -102,7 +105,7 @@ class TestBasicMode(unittest.TestCase):
                 self.assertGreaterEqual(c_r[0], prev)
             prev = c_r[0]
 
-    def test_blink_pattern(self):
+    def test_wave_pattern(self):
         lighting.locked_data.shadow_state["pattern"] = 6
         lighting.locked_data.shadow_state["colors"].append("FF0000")
         lighting.locked_data.shadow_state["colors"].append("00FF00")
