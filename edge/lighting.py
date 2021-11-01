@@ -434,7 +434,7 @@ class LightsaberMode(Mode):
             print("Started.")
 
         if(self._phase == 1):
-            self.pixels = NUM_PIXELS
+            self._pixels = NUM_PIXELS
 #             value = float(self._values[self._tracker])
 #             if(self._tracker < len(self._values)-1):
 #                 self._tracker += 1
@@ -500,7 +500,7 @@ class LightsaberMode(Mode):
                     self._phase = 1
                     
 #         print(pygame.mixer.music.get_pos())        
-        if(self._pixels >= NUM_PIXELS):
+        if(self._pixels > NUM_PIXELS):
             self._pixels = NUM_PIXELS
                 
         color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
