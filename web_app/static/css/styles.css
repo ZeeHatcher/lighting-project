@@ -168,7 +168,11 @@ h2, h3, h4, h5, h6 {
   transition: color 0.15s ease-in-out;
 }
 
-.icon:hover {
+.icon.active {
+  color: #43ffaf;
+}
+
+.icon:hover, .icon.active:hover {
   color: #e5f7ef;
 }
 

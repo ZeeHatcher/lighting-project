@@ -3,14 +3,13 @@ from dotenv import load_dotenv
 import json
 from multiprocessing import Value
 import os
-import random
 import sys
 import threading
 import time
 import traceback
 
 # Cloud connectivity
-from awscrt import auth, io, mqtt, http
+from awscrt import io, mqtt
 from awsiot import iotshadow
 from awsiot import mqtt_connection_builder
 import boto3
@@ -24,8 +23,7 @@ from colorsys import hls_to_rgb
 from PIL import Image
 
 # Music Mode
-import numpy as np
-import librosa
+# import numpy as np
 import pygame
 # from audio_analyzer import *
 from pydub import AudioSegment
@@ -34,24 +32,24 @@ import audioop
 import wave
 from gradient_generator import *
 
-# Serial/Wireless/Virtual output
+# Wireless/Virtual output
 import select
-import serial
 import socket
 from virtual import VirtualLightstick
+
+#lightsaber mode
+import librosa
+import random
 
 load_dotenv()
 
 NUM_PIXELS = int(os.environ.get("NUM_PIXELS"))
-BAUD_RATE = int(os.environ.get("BAUD_RATE"))
-SERIAL_CONN = os.environ.get("SERIAL_CONN")
 
 CERT_DIR = "./.certs/"
 CLIENT_ID = os.environ.get("CLIENT_ID") or str(uuid4())
 S3_BUCKET = os.environ.get("S3_BUCKET")
 THING_NAME = os.environ.get("THING_NAME")
 
-ser = None
 lightstick = None
 
 mode_id = None
@@ -67,8 +65,8 @@ class LockedData:
         self.lock = threading.Lock()
         self.shadow_state = {
             "is_on": False,
-            "mode": 0,
-            "pattern": 0,
+            "mode": 1,
+            "pattern": 1,
             "colors": [],
             "upload_image": 0,
             "upload_audio": 0,
@@ -108,100 +106,126 @@ class NullMode(Mode):
 class MusicMode(Mode):
 #     https://stackoverflow.com/questions/19529230/mp3-with-pyaudio?rq=1
     def __init__(self):
-        #/home/pi/Music/ftc2.ogg or audio
+        self._set = True
+
+        if not os.path.exists("audio"):
+            print("not exist")
+            self._set = False
+            return
+
+        # Don't add songs with any extension
+        # The conversion will cause it to break T-T
         filename = r"audio"
         try:
             self._wf = wave.open(filename,'rb')
         except:
             print("Incompatible format, converting file")
-#             new_filename = r"/home/pi/Music/updated"
             new_file = AudioSegment.from_mp3(filename)
             new_file.export(filename,format="wav")
-#             subprocess.call('ffmpeg -y -i '+ filename+ ' ' + new_filename, shell=True)
             self._wf = wave.open(filename,'rb')
             
-        #Spits out tons of errors
-        #AudioPort emulating errors (not our concern)
-        self._p = pyaudio.PyAudio()
+        self._data = self._wf.readframes(self._wf.getnframes())
         
-#         self._chunk = 1024
-        self._format = self._p.get_format_from_width(self._wf.getsampwidth())
-        self._channels = self._wf.getnchannels()
+#         self._pixels = 0
+        self._previous = 0
+
+        pygame.init()
         self._rate = self._wf.getframerate()
         
-        if self._rate <=16000:
-            self._chunk = 1024
-        else:
-            self._chunk = 4096
+        self._frames_per_sec = int(len(self._data)/(self._wf.getnframes()/self._rate))
 
         #32767(max data for 16bit integer 2^15 -1)
-        self._max = int(32767 * 1.1)
+        self._max = int(32767 * 1.05)
         self._lastHeartBeat = time.time()
         self._increaseHeartBeat = True
-        self._start = 0
 
-        array1 = get_gradient_3d(NUM_PIXELS,1,(252,92,125),(106,130,251),(True,True,True))
-        self._r = [int(val[0]) for val in array1[0]] #+ [int(val[0]) for val in array2[0]]
-        self._g = [int(val[1]) for val in array1[0]] #+ [int(val[1]) for val in array2[0]]
-        self._b = [int(val[2]) for val in array1[0]] #+ [int(val[2]) for val in array2[0]]
+        half_pixels = int(NUM_PIXELS/2)
+        array1 = get_gradient_3d(half_pixels,1,(30,150,0),(255,242,0),(True,True,True))
+        array2 = get_gradient_3d((NUM_PIXELS - half_pixels),1,(255,242,0),(255,0,0),(True,True,True))
+        self._r = [int(val[0]) for val in array1[0]] + [int(val[0]) for val in array2[0]]
+        self._g = [int(val[1]) for val in array1[0]] + [int(val[1]) for val in array2[0]]
+        self._b = [int(val[2]) for val in array1[0]] + [int(val[2]) for val in array2[0]]
         
-        self._stream = self._p.open(format = self._format,
-                              channels = self._channels,
-                              rate = self._rate,
-                              output = True,
-                              frames_per_buffer = self._chunk
-                              )
+        #quit to reset the initial
+        pygame.mixer.quit()
+        pygame.mixer.init(frequency=self._rate)
+        pygame.mixer.music.load(filename)
+        pygame.mixer.music.play()
     
     def run(self):
-#         colors = locked_data.shadow_state["colors"]
-#         color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
+        if not self._set:
+            c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+
+            return c_r, c_g, c_b
+
         c_r = bytearray([0] * NUM_PIXELS)
         c_g = bytearray([0] * NUM_PIXELS)
         c_b = bytearray([0] * NUM_PIXELS)
- 
-        data = self._wf.readframes(self._chunk)
-        sound = 0
-        silence = chr(0)*self._chunk*self._channels*2
-        if len(data) >0:        
-#             if(data == ''):
-#                 data = self._silence
-            self._stream.write(data)
-            reading = audioop.max(data,2)
-            sound += reading
-            percentage = int(sound/self._max * NUM_PIXELS)
-            
-            #Prevent statis on the music bar
-            minimum = int(0.05 * NUM_PIXELS)
-            if(time.time() - self._lastHeartBeat > 0.1 and percentage >0):
-#                 print("Sending heartbeat")
-                if(percentage < minimum):
-                    self._increaseHeartBeat = True
-                if(percentage > (NUM_PIXELS - minimum)):
-                    self._increaseHeartBeat = False
+        
+        try:
+            if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                sound = 0
+                place = int(pygame.mixer.music.get_pos()/1000*self._frames_per_sec)
+                try:
+                    data = self._data[place:place+2048]
+                    if(len(data)>1):
+                        reading = audioop.max(data,2)
+                    else:
+                        reading = self._previous
                     
-                if(self._increaseHeartBeat):
-                    percentage += minimum
-                    self._increaseHeartBeat = False
-                else:
-                    percentage -= minimum
-                    self._increaseHeartBeat = True
-                self._lastHeartBeat = time.time()
-    
+                    if(self._previous is 0):
+                        self._previous = reading
+                    else:
+                        if(reading >= 32760 or abs(self._previous-reading)>20000):
+                            reading = self._previous
+                        else:
+                            self._previous = reading
+                            
+                    sound += reading
+#                 print(reading)
+                    percentage = int(sound/self._max * NUM_PIXELS)
+                    
+#                 if(self._pixels < percentage):
+#                     self._pixels += 1
+#                 
+#                 if(self._pixels > percentage):
+#                     self._pixels -= 1
+#                 
+#                 percentage = self._pixels
+                        
+                    minimum = int(0.05 * NUM_PIXELS)
+                    if(time.time() - self._lastHeartBeat > 0.1 and percentage >0):
+            #                 print("Sending heartbeat")
+                        if(percentage < minimum):
+                            self._increaseHeartBeat = True
+                        if(percentage > (NUM_PIXELS - minimum)):
+                            self._increaseHeartBeat = False
+                            
+                        if(self._increaseHeartBeat):
+                            percentage += minimum
+                            self._increaseHeartBeat = False
+                        else:
+                            percentage -= minimum
+                            self._increaseHeartBeat = True
+                        self._lastHeartBeat = time.time()
+                except:
+                    percentage = 0
+            else:
+                percentage = 0
             c_r[0:percentage] = bytearray(self._r[0:percentage])
             c_g[0:percentage] = bytearray(self._g[0:percentage])
             c_b[0:percentage] = bytearray(self._b[0:percentage])
-                
+
+        except AttributeError:
+            c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+
         return c_r,c_g,c_b
     
     def exit(self):
-#         pass
-        self._stream.stop_stream()
-        self._stream.close()
-        print("Closed stream")
-        self._wf.close()
-        print("Closed wave")
-        self._p.terminate()
-        print("PyAudio Terminated")
+        if self._set:
+            self._wf.close()
+            print("Closed wave")
+            pygame.quit()
 
 class AudioMode(Mode):
     def __init__(self):
@@ -254,7 +278,7 @@ class AudioMode(Mode):
             data = self._stream.read(self._chunk)
             reading = audioop.max(data,2)
             sound += reading
-            time.sleep(.0001)
+            # time.sleep(.0001)
         
         if(len(data) > 0):
             percentage = int(sound/self._max * NUM_PIXELS)
@@ -311,15 +335,22 @@ class BasicMode(Mode):
 
 class ImageMode(Mode):
     def __init__(self):
+        self._set = True
+
+        if not os.path.exists("image"):
+            self._set = False
+            return
+
         # Load and resize image
         im = Image.open("image")
 
         if im.mode == "P":
             im = im.convert("RGB")
 
-        # Resize image while keeping aspect ratio
-        ratio = im.height / im.width
-        im = im.resize((NUM_PIXELS, round(NUM_PIXELS * ratio)))
+        # Resize image while keeping aspect ratio if image width is larger than NUM_PIXELS
+        if im.width > NUM_PIXELS:
+            ratio = im.height / im.width
+            im = im.resize((NUM_PIXELS, round(NUM_PIXELS * ratio)))
 
         rows = [] # 3D-Array: Rows -> Channels -> Color
 
@@ -330,11 +361,16 @@ class ImageMode(Mode):
                 rows[y].append([]) # Initialize channel arrays
 
             # Fill channel arrays with color data
-            for x in range(im.width):
-                colors = im.getpixel((x, y))
+            for x in range(NUM_PIXELS):
+                if x < im.width:
+                    colors = im.getpixel((x, y))
 
-                for c in range(3):
-                    rows[y][c].append(colors[c])
+                    for c in range(3):
+                        rows[y][c].append(colors[c])
+
+                else:
+                    for c in range(3):
+                        rows[y][c].append(0)
 
         im.close()
 
@@ -342,14 +378,18 @@ class ImageMode(Mode):
         self._row = 0
 
     def run(self):
-        c_r = bytearray(self._rows[self._row][0])
-        c_g = bytearray(self._rows[self._row][1])
-        c_b = bytearray(self._rows[self._row][2])
+        if self._set:
+            c_r = bytearray(self._rows[self._row][0])
+            c_g = bytearray(self._rows[self._row][1])
+            c_b = bytearray(self._rows[self._row][2])
 
-        self._row += 1
+            self._row += 1
 
-        if self._row >= len(self._rows):
-            self._row = 0
+            if self._row >= len(self._rows):
+                self._row = 0
+
+        else:
+            c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
 
         return c_r, c_g, c_b
 
@@ -358,35 +398,122 @@ class ImageMode(Mode):
 
 class LightsaberMode(Mode):
     def __init__(self):
+        self._value = Value("f", 0)
         self._thread = None
-        self.v = Value("I", 0)
-        #1 = red, 2 = green, 3 = blue
-        self._type = "blue"
-        #0 = off, 1 = on, 2 = idle
-        self._phase = 1
+        self._phase = 0
         self._pixels = 0
-        pygame.init()
+#         self._value_file = open("values.txt","r")
+#         self._values = self._value_file.read().split("|")
+#         self._tracker = 0
+#         self._stime = 0
+        self._last_val = 0
+        self._consequtive_val = 0
+        pygame.mixer.init()
+        pygame.mixer.set_num_channels(4)
         
-#         locked_data.shadow_state["pattern"]
+        self._direct = "./saber-sounds/"
+        self._start_sound = self._direct+ "saber-on.wav"
+        self._idle_sound = self._direct + "saber-idle.wav"
+        self._clash_sounds = ["saber-clash1.wav","saber-clash2.wav","saber-clash3.wav","saber-clash4.wav"]
+        self._swing_sound = self._direct + "saber-swing.wav"
+        
 
     def run(self):
-        if ser != None:
-            value = ser.read_until().strip()
-            self.v.value = int(value) if value else 0
+        val = self._value.value
+              
+#         c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+        c_r = bytearray([0] * NUM_PIXELS)
+        c_g = bytearray([0] * NUM_PIXELS)
+        c_b = bytearray([0] * NUM_PIXELS)
+        colors = ['0000ff']
 
         if self._thread == None:
             print("Starting publish thread... ", end="")
-            self._thread = threading.Thread(target=publish_sensors_data, args=(self.v,))
+            self._thread = threading.Thread(target=publish_sensors_data, args=(self._value,))
             self._thread.start()
             print("Started.")
 
-        weight = round(self.v.value / 1023 * 255)
-
-        c_r = c_g = c_b = bytearray([weight] * NUM_PIXELS)
-
+        if(self._phase == 1):
+            self.pixels = NUM_PIXELS
+#             value = float(self._values[self._tracker])
+#             if(self._tracker < len(self._values)-1):
+#                 self._tracker += 1
+#             else:
+#                 self._tracker = 0
+                
+#             print (value)
+            
+            clash_channel = pygame.mixer.Channel(1)
+            swing_channel = pygame.mixer.Channel(2)
+            swing_sound = pygame.mixer.Sound(self._swing_sound)
+            clash_sound = pygame.mixer.Sound(self._direct + random.choice(self._clash_sounds))
+#             if (self._last_val < value):
+#             if channel.get_busy():
+#                 pass
+#             else:
+            if(val > 21):
+                if(clash_channel.get_busy()):
+                    pass
+                else:
+                    clash_channel.play(clash_sound)
+                    colors = ['ffffff']
+            elif(val > 11):
+                if(clash_channel.get_busy() or swing_channel.get_busy()):
+                    pass
+                else:
+                    if(self._consequtive_val == 0):
+                        swing_channel.play(swing_sound)
+                        
+                    if(self._consequtive_val >= 3):
+                        swing_channel.play(swing_sound)
+                        self._consequtive_val = 0
+                    
+                    if(val >0.0 and abs(val - self._last_val)<=3):
+                        self._consequtive_val += 1
+                    else:
+                        self._consequtive_val = 0
+                        
+        #             print("Consequtive:",self._consequtive_val)
+                    self._last_val = val
+            else:
+                pass
+                      
+            
+        if(self._phase == 0):
+            song_length = librosa.get_duration(filename=self._start_sound) * 1000
+            if pygame.mixer.music.get_busy():
+                self._pixels = int((pygame.mixer.music.get_pos()/song_length)*NUM_PIXELS)
+                
+                if (pygame.mixer.music.get_pos() > int(song_length*0.95)):
+                    channel = pygame.mixer.Channel(0)
+                    sound = pygame.mixer.Sound(self._idle_sound)
+                    channel.play(sound,loops = -1)
+            else:
+                if(self._pixels == 0):
+                    pygame.mixer.music.load(self._start_sound)
+                    pygame.mixer.music.play()
+#                     self._stime = time.time()
+                else:
+#                     idle = pygame.mixer.music.load(direct+ "saber-idle.wav")
+#                     pygame.mixer.music.play(loops=-1)
+                    self.pixels = NUM_PIXELS
+                    self._phase = 1
+                    
+#         print(pygame.mixer.music.get_pos())        
+        if(self._pixels >= NUM_PIXELS):
+            self._pixels = NUM_PIXELS
+                
+        color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
+        c_r[0:self._pixels] = bytearray([color.r] * self._pixels)
+        c_g[0:self._pixels] = bytearray([color.g] * self._pixels)
+        c_b[0:self._pixels] = bytearray([color.b] * self._pixels)
+        
+        # Limit to 30 frames per second
+        time.sleep(0.034)
         return c_r, c_g, c_b
     
     def exit(self):
+#         self._value_file.close()
         if self._thread != None:
             print("Stopping publish thread... ", end="")
 
@@ -394,7 +521,15 @@ class LightsaberMode(Mode):
             self._thread.join()
 
             self._thread = None
-            print("Stopped.")
+            print("Stopped publish thread.")
+
+    @property
+    def value(self):
+        return self._value.value
+
+    @value.setter
+    def value(self, value):
+        self._value.value = value
 
 class Pattern(ABC):
     @abstractmethod
@@ -448,8 +583,6 @@ class DotPattern(Pattern):
 
         self._i += self._dir
 
-        time.sleep(0.1)
-
         return c_r, c_g, c_b
         
 class WavePattern(Pattern):
@@ -480,8 +613,6 @@ class WavePattern(Pattern):
         if self._i == 0 and not self._ascending:
             self._ascending = True
 
-        time.sleep(0.1)
-
         return c_r, c_g, c_b
 
 class BreathePattern(Pattern):
@@ -511,8 +642,6 @@ class BreathePattern(Pattern):
             self._mult = 0.0
             self._fade_in = True
 
-        time.sleep(0.1)
-        
         return c_r, c_g, c_b
     
 class BlinkPattern(Pattern):
@@ -539,7 +668,7 @@ class BlinkPattern(Pattern):
         c_r = bytearray([color.r] * NUM_PIXELS)
         c_g = bytearray([color.g] * NUM_PIXELS)
         c_b = bytearray([color.b] * NUM_PIXELS)
-        time.sleep(0.1)
+        
         return c_r, c_g, c_b
     
 class RainbowPattern(Pattern):
@@ -561,8 +690,6 @@ class RainbowPattern(Pattern):
         self._r_vals.insert(0,self._r_vals.pop())
         self._b_vals.insert(0,self._b_vals.pop())
         self._g_vals.insert(0,self._g_vals.pop())
-        
-        time.sleep(0.1)
                  
         return c_r, c_g, c_b
         
@@ -688,12 +815,16 @@ def download_file(file_type):
 
     print("Downloading %s... " % file_type, end="")
     s3.download_file(S3_BUCKET, key, file_type)
-    print("Finished.")
+    print("Download completed.")
 
     # Reset mode to load in newly downloaded image
     if mode_id == 2 and file_type == "image":
         mode.exit()
         mode = ImageMode()
+
+    elif mode_id == 3 and file_type == "audio":
+        mode.exit()
+        mode = MusicMode()
 
 def start_download_thread(file_type):
     thread = threading.Thread(target=download_file, args=(file_type,))
@@ -704,18 +835,16 @@ def publish_sensors_data(v):
     while getattr(t, "is_run", True):
         topic = "lightstick/" + THING_NAME + "/data"
         payload = {
-            "x": v.value,
-            "y": 1 / v.value if v.value > 0 else 1
+            "acceleration": v.value,
+            "is_clash": v.value > 21
         }
-
-        print(topic, payload)
 
         mqtt_connection.publish(
             topic=topic,
             payload=json.dumps(payload),
             qos=mqtt.QoS.AT_LEAST_ONCE)
 
-        time.sleep(5)
+        time.sleep(1)
 
     print("Stopped publish thread.")
 
@@ -738,9 +867,14 @@ def change_shadow_state():
     )
     future = shadow_client.publish_update_shadow(request, mqtt.QoS.AT_LEAST_ONCE)
     future.add_done_callback(on_publish_update_shadow)
+    print("Change requested")
+
+
+
+buf = ""
 
 def loop():
-    global mode_id, mode
+    global mode_id, mode, buf
 
     is_on = locked_data.shadow_state["is_on"]
     new_mode_id = locked_data.shadow_state["mode"] if is_on else 0
@@ -767,6 +901,8 @@ def loop():
 
     c_r, c_g, c_b = mode.run()
 
+    # mode.values = tuple(map(lambda v: float(v), l.split(",")))
+
     # Wireless output
     readable, writable, exceptional = select.select(sockets, sockets, sockets)
 
@@ -774,6 +910,7 @@ def loop():
         if s is server_socket: # New client is attempting connection to server
             print("New client detected.")
             client_socket, address = server_socket.accept()
+            client_socket.setblocking(False)
             sockets.append(client_socket)
 
         else: # Client has sent data
@@ -789,10 +926,14 @@ def loop():
                     sockets.remove(s)
                     print("Closed.")
 
+                    break
+
             else:
                 if data:
-                    print(data)
-
+                    if mode_id == 5:
+                        buf += data.decode()
+                        print(buf)
+                        
                 else:
                     print("Received 0 bytes. Connection to client is closed.")
 
@@ -801,6 +942,8 @@ def loop():
                         s.close()
                         sockets.remove(s)
                         print("Closed.")
+
+                    break
 
     for s in writable:
         try:
@@ -826,22 +969,36 @@ def loop():
             s.close()
             print("Closed.")
 
-    # Serial output
-    if ser != None:
-        # Clear buffers for clean input and output
-        ser.reset_input_buffer()
-        ser.reset_output_buffer()
+    # Get latest value from incoming byte stream
+    if mode_id == 5:
+        val = None
 
-        ser.write(c_r)
-        ser.write(c_g)
-        ser.write(c_b)
+        while True:
+            i_delimiter = buf.find("|")
+
+            if i_delimiter == -1:
+#                 print("break")
+                break
+
+
+            val = buf[:i_delimiter]
+            buf = buf[i_delimiter+1:]
+            
+
+        if val != None:
+            mode.value = float(val)
+#             f.write(str(float(val)))
+        else:
+            mode.value = 0
+        
+#         f.write("|")
 
     # Virtual output
     if lightstick != None:
         lightstick.update(c_r, c_g, c_b)
 
     # Limit to 30 frames per second
-#     time.sleep(0.034)
+    time.sleep(0.034)
 
 
 
@@ -853,11 +1010,12 @@ if __name__ == "__main__":
     server_socket.bind(("", 12345))
     server_socket.listen(1)
     print("Initialized.")
+#     f = open("values.txt","a")
 
     sockets = [server_socket]
 
-    # ser = serial.Serial(SERIAL_CONN, BAUD_RATE)
     lightstick = VirtualLightstick(NUM_PIXELS)
+
     s3 = boto3.client("s3")
 
     # Short delay to let serial setup properly
@@ -948,6 +1106,7 @@ if __name__ == "__main__":
             loop()
 
     except KeyboardInterrupt:
+#         f.close()
         exit("Caught KeyboardInterrupt, terminating connections")
 
     except Exception as e:

@@ -1,0 +1,5 @@
+boto3==1.18.63
+Flask==2.0.2
+gunicorn==20.1.0
+python-dotenv==0.19.1
+python-jose[cryptography]==3.3.0
