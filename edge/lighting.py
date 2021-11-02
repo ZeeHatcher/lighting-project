@@ -92,6 +92,9 @@ class Mode(ABC):
     @abstractmethod
     def exit(self):
         pass
+    
+    def _get_colors(self):
+        return locked_data.shadow_state["colors"]
 
 class NullMode(Mode):
     def run(self):
@@ -397,6 +400,7 @@ class ImageMode(Mode):
         pass
 
 class LightsaberMode(Mode):
+    
     def __init__(self):
         self._value = Value("f", 0)
         self._thread = None
@@ -420,13 +424,16 @@ class LightsaberMode(Mode):
 
     def run(self):
         val = self._value.value
-              
-#         c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+
         c_r = bytearray([0] * NUM_PIXELS)
         c_g = bytearray([0] * NUM_PIXELS)
         c_b = bytearray([0] * NUM_PIXELS)
-        colors = ['0000ff']
+        
+#         colors=['0000ff']
+        colors = self._get_colors()
+#         print(locked_data.shadow_state["colors"])
 
+        
         if self._thread == None:
             print("Starting publish thread... ", end="")
             self._thread = threading.Thread(target=publish_sensors_data, args=(self._value,))

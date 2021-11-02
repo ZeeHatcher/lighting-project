@@ -191,7 +191,7 @@
                 set the color(s) displayed in the pattern
                 </p>
 
-                <div id="colors" class="d-flex">
+                <div class="colors" class="d-flex">
                   <button id="btn-submit-color" class="btn btn-primary">submit</button>
                 </div>
               </div>
@@ -303,6 +303,17 @@
                 </div>
                 <div>
                   <canvas id="chart-clash"></canvas>
+                </div>
+              </div>
+              
+              <div class="my-4">
+                <h6 class="m-0">color</h6>
+                <p>
+                set the color of the lightsaber
+                </p>
+
+                <div class="colors" class="d-flex">
+                  <button id="btn-submit-color-lsb" class="btn btn-primary">submit</button>
                 </div>
               </div>
 
@@ -521,7 +532,7 @@
 
         function onColorSubmit() {
           // Get color input values and join into a single string
-          let colors = $("#colors input[type='color']").map(function() {
+          let colors = $(".colors input[type='color']").map(function() {
             return $(this).val().substring(1);
           })
             .get()
@@ -674,7 +685,13 @@
           // Change "active" button
           $("#modes .btn").removeClass("active");
           $(`#modes .btn[data-value='${id}']`).addClass("active");
-
+          if(id==5){
+            changeColorInput("#btn-submit-color-lsb",1);
+          }
+          if(id==1){
+            changeColorPattern(current.pattern);
+          }
+  
           // Switch control panels
           let prev = $("#panels > div").filter(function () {
             return $(this).css("display") == "block";
@@ -690,21 +707,15 @@
             $("#panel-" + modes[id].name).fadeIn(DURATION);
           }
         }
+        
+        function changeColorInput(btn,num_colors){
+          $(btn).attr("disabled", num_colors == 0);
 
-        function changeActivePattern(id) {
-          // Change "active" button
-          $("#patterns .btn").removeClass("active");
-          $(`#patterns .btn[data-value='${id}']`).addClass("active");
-
-          // If pattern does not need colors, disable "submit-color" button
-          let num_colors = patterns[id].num_colors;
-          $("#btn-submit-color").attr("disabled", num_colors == 0);
-
-          $("#colors > *").fadeOut(DURATION, function() {
+          $(".colors > *").fadeOut(DURATION, function() {
             // Update color inputs
             let colors = current.colors;
 
-            $("#colors").find("input[type='color']").remove();
+            $(".colors").find("input[type='color']").remove();
 
             for (let i = 0; i < num_colors; i++) {
               let inputDOM = $("<input type='color' class='btn btn-square p-0 me-1' style='display: none;'>");
@@ -713,12 +724,23 @@
                 inputDOM.val("#" + colors[i]);
               }
 
-              $("#btn-submit-color").before(inputDOM);
+              $(btn).before(inputDOM);
             }
 
-            $("#colors > *").fadeIn(DURATION);
+            $(".colors > *").fadeIn(DURATION);
           });
 
+        }
+
+        function changeActivePattern(id) {
+          // Change "active" button
+          $("#patterns .btn").removeClass("active");
+          $(`#patterns .btn[data-value='${id}']`).addClass("active");
+
+          // If pattern does not need colors, disable "submit-color" button
+          let num_colors = patterns[id].num_colors;
+          changeColorInput("#btn-submit-color",num_colors)
+          
           $("#pattern_sample").attr("src", `static/img/${patterns[id].name}.gif`);
         }
 
@@ -753,6 +775,7 @@
         $(document).on("click", "#modes .btn", onModeSwitch);
         $(document).on("click", "#patterns .btn", onPatternSwitch);
         $(document).on("click", "#btn-submit-color", onColorSubmit);
+        $(document).on("click", "#btn-submit-color-lsb", onColorSubmit);
         $(document).on("click", "#switch-power", onPowerSwitch);
         $(document).on("click", "#btn-upload-image", function() { onUploadFile("image",true); });
         $(document).on("click", "#btn-upload-audio", function() { onUploadFile("audio",true); });
