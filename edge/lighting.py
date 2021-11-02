@@ -939,7 +939,6 @@ def loop():
                 if data:
                     if mode_id == 5:
                         buf += data.decode()
-                        print(buf)
                         
                 else:
                     print("Received 0 bytes. Connection to client is closed.")
