@@ -1,0 +1,7 @@
+// Rename this file to "LightingConfig.h"
+#define WIFI_SSID "wifi_ssid" // SSID of your WiFi network
+#define WIFI_PASSWORD "password" // Password of your WiFi network
+
+#define NUM_PIXELS 8 // Number of pixels to display
+
+const int address[4] = { 192, 168, 0, 1 }; // Address of your RPi, split into 4 parts
