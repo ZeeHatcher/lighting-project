@@ -24,7 +24,7 @@ load_dotenv()
 MIME_TYPES = ["image/jpeg", "image/png", "audio/mpeg", "audio/wav"]
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024 # 1MB maximum file size
+app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024 # 25MB maximum file size
 app.secret_key=uuid4().hex
 
 keys_url = 'https://cognito-idp.ap-southeast-1.amazonaws.com/{}/.well-known/jwks.json'.format(os.getenv("USERPOOL_ID"))

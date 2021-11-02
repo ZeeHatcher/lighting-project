@@ -131,7 +131,7 @@ USERPOOL_ID=$(aws cognito-idp create-user-pool \
 CLIENT_ID=$(aws cognito-idp create-user-pool-client \
   --user-pool-id $USERPOOL_ID \
   --client-name LPWebServer \
-  --explicit-auth-flows "ALLOW_ADMIN_USER_PASSWORD_AUTH" "ALLOW_USER_PASSWORD_AUTH" \
+  --explicit-auth-flows "ALLOW_ADMIN_USER_PASSWORD_AUTH" "ALLOW_USER_PASSWORD_AUTH" "ALLOW_REFRESH_TOKEN_AUTH" \
   | jq -r ".UserPoolClient.ClientId")
 
 # Create user groups and user accounts
@@ -187,7 +187,7 @@ INSTANCE_ID=$(aws ec2 run-instances \
   --security-group-ids $SECURITY_GROUP_ID \
   --user-data "$(sed "s/<CLIENT_ID>/$CLIENT_ID/g" ec2/userdata.sh | sed "s/<USERPOOL_ID>/$USERPOOL_ID/g" | sed "s/<S3_BUCKET>/$S3_BUCKET/g")" \
   --iam-instance-profile Name=LPRoleForEC2 \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=name,Value=LPWebServer}]' \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=LPWebServer}]' \
   --count 1 \
   | jq -r ".Instances[0].InstanceId")
 # ---===========---
@@ -203,6 +203,6 @@ tee undeploy.json > /dev/null <<EOT
   "USERPOOL_ID": "$USERPOOL_ID",
   "S3_BUCKET": "$S3_BUCKET",
   "SECURITY_GROUP_ID": "$SECURITY_GROUP_ID",
-  "INSTANCE_ID": "$INSTANCE_ID",
+  "INSTANCE_ID": "$INSTANCE_ID"
 }
 EOT
