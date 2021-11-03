@@ -24,6 +24,7 @@ from PIL import Image
 
 # Music Mode
 # import numpy as np
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 # from audio_analyzer import *
 from pydub import AudioSegment
@@ -350,7 +351,7 @@ class ImageMode(Mode):
         # Resize image while keeping aspect ratio if image width is larger than NUM_PIXELS
         if im.width > NUM_PIXELS:
             ratio = im.height / im.width
-            im = im.resize((NUM_PIXELS, round(NUM_PIXELS * ratio)))
+            im = im.resize((NUM_PIXELS, max(1, round(NUM_PIXELS * ratio))))
 
         rows = [] # 3D-Array: Rows -> Channels -> Color
 

@@ -205,15 +205,15 @@ def login():
                 }
             )
 ##### Run this if "NEW_PASSWORD_REQUIRED" Challenge Posed #####    
-#         chg = client.respond_to_auth_challenge(
-#             ClientId = CLIENT_ID,
-#             ChallengeName="NEW_PASSWORD_REQUIRED",
-#             ChallengeResponses={
-#                 "USERNAME":"username",
-#                 "NEW_PASSWORD": "password"
-#             },
-#             Session=response["Session"]            
-#         )
+#             chg = client.respond_to_auth_challenge(
+#                 ClientId = CLIENT_ID,
+#                 ChallengeName="NEW_PASSWORD_REQUIRED",
+#                 ChallengeResponses={
+#                     "USERNAME":username,
+#                     "NEW_PASSWORD": "testing1"
+#                 },
+#                 Session=response["Session"]            
+#             )
             
         except (client.exceptions.NotAuthorizedException, client.exceptions.UserNotFoundException) as e:
             abort(401)
