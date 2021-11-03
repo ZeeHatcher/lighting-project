@@ -93,6 +93,9 @@ class Mode(ABC):
     @abstractmethod
     def exit(self):
         pass
+    
+    def _get_colors(self):
+        return locked_data.shadow_state["colors"]
 
 class NullMode(Mode):
     def run(self):
@@ -398,6 +401,7 @@ class ImageMode(Mode):
         pass
 
 class LightsaberMode(Mode):
+    
     def __init__(self):
         self._value = Value("f", 0)
         self._thread = None
@@ -421,13 +425,16 @@ class LightsaberMode(Mode):
 
     def run(self):
         val = self._value.value
-              
-#         c_r = c_g = c_b = bytearray([0] * NUM_PIXELS)
+
         c_r = bytearray([0] * NUM_PIXELS)
         c_g = bytearray([0] * NUM_PIXELS)
         c_b = bytearray([0] * NUM_PIXELS)
-        colors = ['0000ff']
+        
+#         colors=['0000ff']
+        colors = self._get_colors()
+#         print(locked_data.shadow_state["colors"])
 
+        
         if self._thread == None:
             print("Starting publish thread... ", end="")
             self._thread = threading.Thread(target=publish_sensors_data, args=(self._value,))
@@ -435,7 +442,7 @@ class LightsaberMode(Mode):
             print("Started.")
 
         if(self._phase == 1):
-            self.pixels = NUM_PIXELS
+            self._pixels = NUM_PIXELS
 #             value = float(self._values[self._tracker])
 #             if(self._tracker < len(self._values)-1):
 #                 self._tracker += 1
@@ -501,7 +508,7 @@ class LightsaberMode(Mode):
                     self._phase = 1
                     
 #         print(pygame.mixer.music.get_pos())        
-        if(self._pixels >= NUM_PIXELS):
+        if(self._pixels > NUM_PIXELS):
             self._pixels = NUM_PIXELS
                 
         color = Color(colors[0]) if len(colors) > 0 and len(colors[0]) == 6 else Color()
@@ -933,7 +940,6 @@ def loop():
                 if data:
                     if mode_id == 5:
                         buf += data.decode()
-                        print(buf)
                         
                 else:
                     print("Received 0 bytes. Connection to client is closed.")
@@ -999,7 +1005,8 @@ def loop():
         lightstick.update(c_r, c_g, c_b)
 
     # Limit to 30 frames per second
-    time.sleep(0.034)
+    # time.sleep(0.034)
+    time.sleep(0.011)
 
 
 

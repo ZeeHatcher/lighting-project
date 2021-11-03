@@ -62,6 +62,7 @@ void setup() {
 
   accel = mpu.getAccelerometerSensor();
 
+  strip.setBrightness(128);
   strip.clear();
   strip.show();
 }
@@ -92,7 +93,8 @@ void loop() {
     client.print("|");
 
     // Limit loop rate to 30 frames per second
-    delay(34);
+//    delay(34);
+    delay(10);
   } else if (WiFi.status() != WL_CONNECTED) {
     // (Re)Connect to WiFi network
     connectToWiFi();
