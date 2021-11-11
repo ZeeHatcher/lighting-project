@@ -576,7 +576,7 @@
         }
 
         function onMicrophoneMaxSubmit() {
-          let val = parseInt(scale($("#microphone-max").val(), 0.5, 2, 16383.5, 65534));
+          let val = parseInt(scale($("#microphone-max").val(), 0.5, 2, 65534, 16383.5));
           updateLightstick("microphone_max", val);
         }
 
