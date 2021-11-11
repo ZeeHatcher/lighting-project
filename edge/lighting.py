@@ -24,6 +24,7 @@ from PIL import Image
 
 # Music Mode
 # import numpy as np
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 # from audio_analyzer import *
 from pydub import AudioSegment
@@ -70,6 +71,7 @@ class LockedData:
             "colors": [],
             "upload_image": 0,
             "upload_audio": 0,
+            "microphone_max": 32767,
         }
 
 locked_data = LockedData()
@@ -236,8 +238,10 @@ class AudioMode(Mode):
         self._format = pyaudio.paInt16
         self._channels = 2
         self._rate = 44100
-        #32767(max data for 16bit integer) * 2
-        self._max = 65534
+        #Low: 16383
+        #Medium: 32767
+        #High: 65534
+        #self._max = locked_data.shadow_state["microphone_max"]
         self._dev_index = 0
         
         half_pixels = int(NUM_PIXELS/2)
@@ -282,9 +286,9 @@ class AudioMode(Mode):
             reading = audioop.max(data,2)
             sound += reading
             # time.sleep(.0001)
-        
+        microphone_max = locked_data.shadow_state["microphone_max"]
         if(len(data) > 0):
-            percentage = int(sound/self._max * NUM_PIXELS)
+            percentage = int(sound/microphone_max * NUM_PIXELS)
 #             print(percentage)
             c_r[0:percentage] = bytearray(self._r[0:percentage])
             c_g[0:percentage] = bytearray(self._g[0:percentage])
@@ -353,7 +357,7 @@ class ImageMode(Mode):
         # Resize image while keeping aspect ratio if image width is larger than NUM_PIXELS
         if im.width > NUM_PIXELS:
             ratio = im.height / im.width
-            im = im.resize((NUM_PIXELS, round(NUM_PIXELS * ratio)))
+            im = im.resize((NUM_PIXELS, max(1, round(NUM_PIXELS * ratio))))
 
         rows = [] # 3D-Array: Rows -> Channels -> Color
 

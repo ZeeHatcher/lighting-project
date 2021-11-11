@@ -25,7 +25,6 @@
         <header>
           <h1>lighting_project</h1>
         </header>
-
         <main class="d-flex justify-content-center align-items-center" style="height: 90%;">
           <div id="section-login">
             <h6 class="text-lit">login</h6>
@@ -64,6 +63,8 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js" integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU=" crossorigin="anonymous"></script>
     <script>
       $(document).ready(function() {
+	  const DURATION = 200;
+	  
         var validation = Array.prototype.filter.call($("#form-login"), function(form) {
           form.addEventListener('submit', function(event) {
             event.preventDefault();
