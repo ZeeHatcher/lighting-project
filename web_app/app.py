@@ -154,7 +154,7 @@ def update(name):
     field = request.form["field"]
     value = None
 
-    if field == "mode" or field == "pattern":
+    if field == "mode" or field == "pattern" or field == "microphone_max":
         value = request.form.get("value", type=int)
     elif field == "is_on":
         value = request.form.get("value") == "true"
