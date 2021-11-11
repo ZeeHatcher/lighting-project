@@ -580,6 +580,12 @@
           updateLightstick("microphone_max", val);
         }
 
+        function updateMicrophoneSelected() {
+          let converted = current["microphone_max"] ? scale(current["microphone_max"], 16383.5, 65534, 2, 0.5) : 1;
+          $("#microphone-max").val(converted);
+          $("#microphone-max-selected").text(`${Number(converted).toFixed(1)}x`);
+        }
+
         function onPowerSwitch() {
           let isOn = $(this).is(":checked") ? true : false;
 
@@ -603,6 +609,7 @@
           // Update site state
           $("#lightstick-name").text(current["name"]);
           $("#preview-image").attr("src","data:image/png;base64," + current["image"]);
+          updateMicrophoneSelected();
           changeActivePage("home");
           changeLightstick();
           toggleBlind(current.is_on);
@@ -826,6 +833,7 @@
         // Set initial website state
         $("#lightstick-name").text(current["name"]);
         $("#preview-image").attr("src","data:image/png;base64," + current["image"]);
+        updateMicrophoneSelected();
         changeLightstick();
         toggleBlind(current.is_on);
         toggleSwitch(current.is_on);
