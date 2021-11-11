@@ -34,5 +34,3 @@ aws iam delete-role-policy --role-name LPRoleForEC2 --policy-name LPPolicyForLig
 aws iam delete-role --role-name LPRoleForEC2
 
 aws ec2 delete-security-group --group-name LPSecurityGroupForWebServer
-
-rm undeploy.json

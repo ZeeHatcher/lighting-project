@@ -184,6 +184,34 @@ h2, h3, h4, h5, h6 {
   white-space: nowrap;
 }
 
+.slider {
+  -webkit-appearance: none;  /* Override default CSS styles */
+  appearance: none;
+  outline: none;
+  width: 50%;
+  height: 1em;
+  border-radius: 1em;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none; /* Override default look */
+  appearance: none;
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 0.7em;
+  background: #e5f7ef;
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 0.7em;
+  background: #e5f7ef;
+  cursor: pointer;
+}
+
 .sidebar-item {
   color: #e5f7ef;
   transition: color 0.15s ease-in-out;
@@ -206,6 +234,10 @@ h2, h3, h4, h5, h6 {
 
 .switch-label.active {
   color: #43ffaf;
+}
+
+.text-primary {
+  color: #43ffaf!important;
 }
 
 .text-muted {

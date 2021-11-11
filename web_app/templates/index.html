@@ -281,6 +281,31 @@
               </div>
 
               <div class="my-4">
+                <h6 class="m-0">sensitivity</h6>
+                <p>
+                set the sensitivity of the lightstick output towards voice input
+                </p>
+
+                <div class="d-flex justify-content-center align-items-center">
+                  <span class="fs-7 me-2 text-muted">0.5x</span>
+                  <input class="slider me-2" id="microphone-max" type="range" min="0.5" max="2" step="0.1" value="1.0">
+                  <span class="fs-7 me-2 text-muted">2.0x</span>
+                </div>
+                <p id="microphone-max-selected" class="text-center text-primary">1.0x</p>
+                <div class="text-center mt-3">
+                  <button id="btn-submit-microphone-max" class="btn btn-primary">submit</button>
+                </div>
+
+                <!--<div id="switch" class="col d-flex justify-content-end align-items-center">-->
+                  <!--<span id="switch-label-off" class="fs-7 me-2 switch-label">off</span>-->
+                  <!--<div class="form-switch">-->
+                    <!--<input id="switch-power" class="form-check-input" type="checkbox">-->
+                  <!--</div>-->
+                  <!--<span id="switch-label-on" class="fs-7 switch-label">on</span>-->
+                <!--</div>-->
+              </div>
+
+              <div class="my-4">
                 <h6 class="m-0">expected output</h6>
                 <p>
                 the light stick should react accordingly to your voice input.
@@ -340,6 +365,10 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js" integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU=" crossorigin="anonymous"></script>
     <script>
+      function scale (number, inMin, inMax, outMin, outMax) {
+        return (number - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+      }
+
       $(document).ready(function() {
         const DURATION = 200;
         const FILE_SIZE_LIMIT = 25 * 1024 * 1024 // File size limit of 1MB
@@ -541,6 +570,22 @@
           updateLightstick("colors", colors);
         }
 
+        function onMicrophoneMaxSlide() {
+          let val = $("#microphone-max").val();
+          $("#microphone-max-selected").text(`${Number(val).toFixed(1)}x`);
+        }
+
+        function onMicrophoneMaxSubmit() {
+          let val = parseInt(scale($("#microphone-max").val(), 0.5, 2, 65534, 16383.5));
+          updateLightstick("microphone_max", val);
+        }
+
+        function updateMicrophoneSelected() {
+          let converted = current["microphone_max"] ? scale(current["microphone_max"], 16383.5, 65534, 2, 0.5) : 1;
+          $("#microphone-max").val(converted);
+          $("#microphone-max-selected").text(`${Number(converted).toFixed(1)}x`);
+        }
+
         function onPowerSwitch() {
           let isOn = $(this).is(":checked") ? true : false;
 
@@ -564,6 +609,7 @@
           // Update site state
           $("#lightstick-name").text(current["name"]);
           $("#preview-image").attr("src","data:image/png;base64," + current["image"]);
+          updateMicrophoneSelected();
           changeActivePage("home");
           changeLightstick();
           toggleBlind(current.is_on);
@@ -772,6 +818,8 @@
         $(document).on("click", "#patterns .btn", onPatternSwitch);
         $(document).on("click", "#btn-submit-color", function() { onColorSubmit("#colors") });
         $(document).on("click", "#btn-submit-color-lightsaber", function() { onColorSubmit("#colors-lightsaber") });
+        $(document).on("click", "#btn-submit-microphone-max", onMicrophoneMaxSubmit);
+        $(document).on("input", "#microphone-max", onMicrophoneMaxSlide);
         $(document).on("click", "#switch-power", onPowerSwitch);
         $(document).on("click", "#btn-upload-image", function() { onUploadFile("image",true); });
         $(document).on("click", "#btn-upload-audio", function() { onUploadFile("audio",true); });
@@ -785,6 +833,7 @@
         // Set initial website state
         $("#lightstick-name").text(current["name"]);
         $("#preview-image").attr("src","data:image/png;base64," + current["image"]);
+        updateMicrophoneSelected();
         changeLightstick();
         toggleBlind(current.is_on);
         toggleSwitch(current.is_on);
