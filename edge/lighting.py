@@ -46,7 +46,6 @@ load_dotenv()
 
 NUM_PIXELS = int(os.environ.get("NUM_PIXELS"))
 
-CERT_DIR = "./.certs/"
 CLIENT_ID = os.environ.get("CLIENT_ID") or str(uuid4())
 S3_BUCKET = os.environ.get("S3_BUCKET")
 THING_NAME = os.environ.get("THING_NAME")
@@ -1040,10 +1039,10 @@ if __name__ == "__main__":
     # Initiate MQTT connection
     mqtt_connection = mqtt_connection_builder.mtls_from_path(
         endpoint=os.environ.get("THING_ENDPOINT"),
-        cert_filepath=CERT_DIR + os.environ.get("CERT_FILE"),
-        pri_key_filepath=CERT_DIR + os.environ.get("PRIVATE_KEY_FILE"),
+        cert_filepath=os.environ.get("CERT_FILE"),
+        pri_key_filepath=os.environ.get("PRIVATE_KEY_FILE"),
         client_bootstrap=client_bootstrap,
-        ca_filepath=CERT_DIR + os.environ.get("CA_FILE"),
+        ca_filepath=os.environ.get("CA_FILE"),
         client_id=CLIENT_ID,
         clean_session=False,
         keep_alive_secs=6)

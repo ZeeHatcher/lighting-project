@@ -59,7 +59,7 @@ def index():
     patterns = {}
     
     # Get modes from DynamoDB and format into dict
-    table_modes = dynamodb.Table("modes")
+    table_modes = dynamodb.Table("LightingProjectModes")
     items = table_modes.scan()["Items"]
     items = sorted(items, key=lambda k: k["id"])
     for item in items:
@@ -67,7 +67,7 @@ def index():
         modes[item["id"]] = item
 
     # Get patterns from DynamoDB and format into dict
-    table_patterns = dynamodb.Table("patterns")
+    table_patterns = dynamodb.Table("LightingProjectPatterns")
     items = table_patterns.scan()["Items"]
     items = sorted(items, key=lambda k: k["id"])
     for item in items:
@@ -110,7 +110,7 @@ def index():
 @app.route("/lightstick/<name>/data")
 def get_sensors_data(name):
     dynamodb = boto3.resource("dynamodb")
-    table = dynamodb.Table("sensors_data")
+    table = dynamodb.Table("LightingProjectSensorsData")
 
     response = table.query(
         KeyConditionExpression=Key("thing_name").eq(name),

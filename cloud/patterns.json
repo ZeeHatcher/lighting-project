@@ -1,5 +1,5 @@
 {
-    "patterns": [
+    "LightingProjectPatterns": [
         {
             "PutRequest": {
                 "Item": {
