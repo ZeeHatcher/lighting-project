@@ -1,0 +1,458 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  # ---=== IAM ===---
+  RoleForIoTRule:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "iot.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "LightingProjectPolicyForDynamoDBPutAccess"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "dynamodb:PutItem"
+                Resource: !GetAtt TableSensorsData.Arn
+      RoleName: "LightingProjectRoleForIoTRule"
+
+  RoleForLambda:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "LightingProjectPolicyForIoTUpdateThingShadowAccess"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "iot:UpdateThingShadow"
+                Resource: !Join
+                  - ""
+                  - - "arn:aws:iot:"
+                    - !Ref AWS::Region
+                    - ":"
+                    - !Ref AWS::AccountId
+                    - ":thing/lightstick*"
+      RoleName: "LightingProjectRoleForLambda"
+
+  RoleForWebServer:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "ec2.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "LightingProjectPolicyForDataAccess"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "cognito-idp:InitiateAuth"
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "dynamodb:BatchGetItem"
+                  - "dynamodb:GetItem"
+                  - "dynamodb:Scan"
+                  - "dynamodb:Query"
+                Resource:
+                  - !GetAtt TableModes.Arn
+                  - !GetAtt TablePatterns.Arn
+                  - !GetAtt TableSensorsData.Arn
+              - Effect: "Allow"
+                Action:
+                  - "iot:GetThingShadow"
+                  - "iot:UpdateThingShadow"
+                Resource: !Join
+                  - ""
+                  - - "arn:aws:iot:"
+                    - !Ref AWS::Region
+                    - ":"
+                    - !Ref AWS::AccountId
+                    - ":thing/lightstick*"
+              - Effect: "Allow"
+                Action: "iot:ListThingsInThingGroup"
+                Resource: !Join
+                  - ""
+                  - - "arn:aws:iot:"
+                    - !Ref AWS::Region
+                    - ":"
+                    - !Ref AWS::AccountId
+                    - ":thinggroup/lightsticks"
+              - Effect: "Allow"
+                Action:
+                  - "s3:GetObject"
+                  - "s3:PutObject"
+                Resource: !Join
+                  - ""
+                  - - !GetAtt Bucket.Arn
+                    - "/lightstick*"
+      RoleName: "LightingProjectRoleForWebServer"
+
+  InstanceProfileForWebServer:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      InstanceProfileName: "LightingProjectRoleForWebServer"
+      Roles:
+        - !Ref RoleForWebServer
+
+  UserForNode:
+    Type: "AWS::IAM::User"
+    Properties: 
+      Policies: 
+        - PolicyName: "LightingProjectPolicyForS3WriteAccess"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action: "s3:PutObject"
+                Effect: "Allow"
+                Resource: !Join
+                  - ""
+                  - - !GetAtt Bucket.Arn
+                    - "/*"
+      UserName: "LightingProjectNode"
+
+  # ---=== DynamoDB ===---
+  TableModes:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "id"
+          AttributeType: "N"
+      BillingMode: "PAY_PER_REQUEST"
+      KeySchema:
+        - AttributeName: "id"
+          KeyType: "HASH"
+      TableName: "LightingProjectModes"
+
+  TablePatterns:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "id"
+          AttributeType: "N"
+      BillingMode: "PAY_PER_REQUEST"
+      KeySchema:
+        - AttributeName: "id"
+          KeyType: "HASH"
+      TableName: "LightingProjectPatterns"
+
+  TableSensorsData:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "thing_name"
+          AttributeType: "S"
+        - AttributeName: "timestamp"
+          AttributeType: "N"
+      BillingMode: "PAY_PER_REQUEST"
+      KeySchema:
+        - AttributeName: "thing_name"
+          KeyType: "HASH"
+        - AttributeName: "timestamp"
+          KeyType: "RANGE"
+      TableName: "LightingProjectSensorsData"
+
+  # ---=== S3 ===---
+  Bucket:
+    DependsOn: "FunctionPermission"
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: "lighting-project-bucket"
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: "s3:ObjectCreated:*"
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: "prefix"
+                    Value: "lightstick"
+            Function: !GetAtt FunctionForUploadNotification.Arn
+
+  BucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref Bucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: "s3:GetObject"
+            Effect: "Allow"
+            Principal: "*"
+            Resource: !Join
+              - ''
+              - - !GetAtt Bucket.Arn
+                - "/*"
+
+  # ---=== IoT Core ===---
+  PolicyForNode:
+    Type: "AWS::IoT::Policy"
+    Properties: 
+      PolicyName: "LightingProjectPolicyForIotShadowReadWriteAccess"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Action: "iot:Publish"
+          Resource:
+            - !Join
+              - ""
+              - - "arn:aws:iot:"
+                - !Ref AWS::Region
+                - ":"
+                - !Ref AWS::AccountId
+                - ":topic/$aws/things/lightstick*/shadow/get"
+            - !Join
+              - ""
+              - - "arn:aws:iot:"
+                - !Ref AWS::Region
+                - ":"
+                - !Ref AWS::AccountId
+                - ":topic/$aws/things/lightstick*/shadow/update"
+            - !Join
+              - ""
+              - - "arn:aws:iot:"
+                - !Ref AWS::Region
+                - ":"
+                - !Ref AWS::AccountId
+                - ":topic/$aws/things/lightstick*/data"
+        - Effect: "Allow"
+          Action: "iot:Receive"
+          Resource:
+            - !Join
+              - ""
+              - - "arn:aws:iot:"
+                - !Ref AWS::Region
+                - ":"
+                - !Ref AWS::AccountId
+                - ":topic/$aws/things/lightstick*/shadow/get/*"
+            - !Join
+              - ""
+              - - "arn:aws:iot:"
+                - !Ref AWS::Region
+                - ":"
+                - !Ref AWS::AccountId
+                - ":topic/$aws/things/lightstick*/shadow/update/*"
+        - Effect: "Allow"
+          Action: "iot:Subscribe"
+          Resource:
+            - !Join
+              - ""
+              - - "arn:aws:iot:"
+                - !Ref AWS::Region
+                - ":"
+                - !Ref AWS::AccountId
+                - ":topicfilter/$aws/things/lightstick*/shadow/get/*"
+            - !Join
+              - ""
+              - - "arn:aws:iot:"
+                - !Ref AWS::Region
+                - ":"
+                - !Ref AWS::AccountId
+                - ":topicfilter/$aws/things/lightstick*/shadow/update/*"
+        - Effect: "Allow"
+          Action: "iot:Connect"
+          Resource: "*"
+
+  RuleForSensorsData:
+    Type: "AWS::IoT::TopicRule"
+    Properties: 
+      RuleName: "LightingProjectRuleForSensorsData"
+      TopicRulePayload:
+        Actions:
+          - DynamoDB:
+              HashKeyField: "thing_name"
+              HashKeyType: "STRING"
+              HashKeyValue: "${topic(2)}"
+              PayloadField: "data"
+              RangeKeyField: "timestamp"
+              RangeKeyType: "NUMBER"
+              RangeKeyValue: "${timestamp()}"
+              RoleArn: !GetAtt RoleForIoTRule.Arn
+              TableName: !Ref TableSensorsData
+        Sql: "SELECT acceleration, is_clash FROM 'lightstick/+/data'"
+
+  # ---=== Lambda ===---
+  FunctionForUploadNotification:
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      Code: 
+        ZipFile: |
+          import boto3
+          import json
+          import time
+          import urllib.parse
+
+          iot_data = boto3.client("iot-data")
+
+          def handler(event, context):
+              # Get object key
+              key = urllib.parse.unquote_plus(event['Records'][0]['s3']['object']['key'], encoding='utf-8')
+              
+              # Extract required data
+              tokens = key.split("/")
+              name = tokens[0]
+              file_type = tokens[1]
+
+              # Initialize data to update shadow with
+              desired = { "upload_" + file_type: round(time.time()) }
+              payload = { "state": { "desired": desired } }
+              
+              iot_data.update_thing_shadow(thingName=name, payload=json.dumps(payload))
+      FunctionName: "LightingProjectFunctionForUploadNotification"
+      Handler: "index.handler"
+      Role: !GetAtt RoleForLambda.Arn
+      Runtime: "python3.8"
+
+  FunctionPermission:
+    Type: "AWS::Lambda::Permission"
+    Properties: 
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref FunctionForUploadNotification
+      Principal: "s3.amazonaws.com"
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: "arn:aws:s3:::lighting-project-bucket"
+
+  # ---=== Cognito ===---
+  UserPool:
+    Type: "AWS::Cognito::UserPool"
+    Properties:
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: False
+          RequireNumbers: False
+          RequireSymbols: False
+          RequireUppercase: False
+          TemporaryPasswordValidityDays: 365
+      UserPoolName: "LightingProjectUserPool"
+
+  UserPoolClient:
+    Type: "AWS::Cognito::UserPoolClient"
+    Properties:
+      ClientName: "LightingProjectWebServer"
+      ExplicitAuthFlows:
+        - "ALLOW_ADMIN_USER_PASSWORD_AUTH"
+        - "ALLOW_USER_PASSWORD_AUTH"
+        - "ALLOW_REFRESH_TOKEN_AUTH"
+      UserPoolId: !Ref UserPool
+
+  UserPoolGroupAdmin:
+    Type: "AWS::Cognito::UserPoolGroup"
+    Properties:
+      GroupName: "admin"
+      UserPoolId: !Ref UserPool
+
+  UserPoolUserAdmin:
+    Type: "AWS::Cognito::UserPoolUser"
+    Properties: 
+      MessageAction: "SUPPRESS"
+      Username: "admin"
+      UserPoolId: !Ref UserPool
+
+  UserPoolUserUser:
+    Type: "AWS::Cognito::UserPoolUser"
+    Properties: 
+      MessageAction: "SUPPRESS"
+      Username: "user"
+      UserPoolId: !Ref UserPool
+
+  UserPoolAttachAdminGroup:
+    Type: "AWS::Cognito::UserPoolUserToGroupAttachment"
+    Properties: 
+      GroupName: !Ref UserPoolGroupAdmin
+      Username: !Ref UserPoolUserAdmin
+      UserPoolId: !Ref UserPool
+
+  # ---=== EC2 ===---
+  SecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties: 
+      GroupDescription: "Public access to Lighting Project website served from port 80."
+      GroupName: "LightingProjectSecurityGroupForWebServer"
+      SecurityGroupIngress: 
+        - CidrIp: "0.0.0.0/0"
+          FromPort: 80
+          IpProtocol: "tcp"
+          ToPort: 80
+
+  WebServerInstance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      IamInstanceProfile: !Ref InstanceProfileForWebServer
+      ImageId: "ami-0dc5785603ad4ff54"
+      InstanceType: "t2.micro"
+      SecurityGroups:
+        - !Ref SecurityGroup
+      Tags:
+        - Key: "Name"
+          Value: "LightingProjectWebServer"
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            cd /home/ec2-user/
+
+            yum update -y
+            amazon-linux-extras enable nginx1
+            yum install -y git nginx
+
+            git clone https://github.com/ZeeHatcher/lighting-project.git
+
+            python3 -m venv venv
+            source venv/bin/activate
+            python -m pip install -r lighting-project/web_app/requirements.txt
+            deactivate
+
+            mv lighting-project/web_app/ ./www
+            rm -fr lighting-project
+
+            tee /etc/systemd/system/flask-app.service > /dev/null <<EOT
+            [Unit]
+            Description=LightingProject Flask App
+
+            [Service]
+            Environment="AWS_DEFAULT_REGION=${AWS::Region}"
+            Environment="S3_BUCKET=${Bucket}"
+            Environment="COGNITO_USER_CLIENT_ID=${UserPoolClient}"
+            Environment="USERPOOL_ID=${UserPool}"
+            ExecStart=/home/ec2-user/venv/bin/gunicorn --chdir /home/ec2-user/www/ wsgi:app
+            Restart=on-failure
+
+            [Install]
+            WantedBy=multi-user.target
+            EOT
+            systemctl start flask-app
+            systemctl enable flask-app
+
+            tee /etc/nginx/default.d/flask-app.conf > /dev/null <<EOT
+            location / {
+                proxy_pass         http://127.0.0.1:8000/;
+                proxy_redirect     off;
+
+                proxy_set_header   Host                 \$host;
+                proxy_set_header   X-Real-IP            \$remote_addr;
+                proxy_set_header   X-Forwarded-For      \$proxy_add_x_forwarded_for;
+                proxy_set_header   X-Forwarded-Proto    \$scheme;
+            }
+            EOT
+            systemctl start nginx
+            systemctl enable nginx
+
+            systemctl daemon-reload
