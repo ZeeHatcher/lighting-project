@@ -1,8 +1,0 @@
-{
-    "Version": "2012-10-17",
-    "Statement": {
-      "Effect": "Allow",
-      "Action": "iot:UpdateThingShadow",
-      "Resource": "arn:aws:iot:ap-southeast-1:<ACCOUNT_ID>:thing/lightstick*"
-    }
-}
