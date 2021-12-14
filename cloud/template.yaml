@@ -231,7 +231,7 @@ Resources:
                 - !Ref AWS::Region
                 - ":"
                 - !Ref AWS::AccountId
-                - ":topic/$aws/things/lightstick*/data"
+                - ":topic/lightstick/lightstick*/data"
         - Effect: "Allow"
           Action: "iot:Receive"
           Resource:
@@ -450,6 +450,8 @@ Resources:
                 proxy_set_header   X-Real-IP            \$remote_addr;
                 proxy_set_header   X-Forwarded-For      \$proxy_add_x_forwarded_for;
                 proxy_set_header   X-Forwarded-Proto    \$scheme;
+
+                client_max_body_size 30M;
             }
             EOT
             systemctl start nginx
